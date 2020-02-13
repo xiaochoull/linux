@@ -8,6 +8,7 @@ config IIO_ALL_ADI_DRIVERS
 	tristate "Build all Analog Devices IIO Drivers"
 	select ADIS16201
 	select ADIS16209
+	select INPUT_ADXL34x if INPUT_MISX
 	select ADXL345_I2C if I2C
 	select ADXL345_SPI if SPI
 	select ADXL372_I2C if I2C
