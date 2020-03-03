@@ -28,6 +28,7 @@ obj-$(CONFIG_AD7887) += ad7887.o
 obj-$(CONFIG_AD7949) += ad7949.o
 obj-$(CONFIG_AD799X) += ad799x.o
 obj-$(CONFIG_AD9467) += ad9467.o
+obj-$(CONFIG_AD9680) += ad9680.o
 obj-$(CONFIG_ADI_AXI_ADC) += adi-axi-adc.o
 
 cf_axi_adc-y := cf_axi_adc_core.o
