@@ -1034,7 +1034,7 @@ static int adp5589_probe(struct i2c_client *client,
 
 	ret = adp5589_i2c_get_driver_data(client, id);
 	if (ret < 0)
-		return ret;
+		goto err_free_mem;
 
 	switch (ret) {
 	case ADP5585_02:
