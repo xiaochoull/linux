@@ -1013,7 +1013,7 @@ static int adp5589_probe(struct i2c_client *client,
 	const struct adp5589_kpad_platform_data *pdata =
 		dev_get_platdata(&client->dev);
 	unsigned int revid;
-	int error, ret;
+	int ret;
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_BYTE_DATA)) {
@@ -1051,28 +1051,26 @@ static int adp5589_probe(struct i2c_client *client,
 	}
 
 	ret = adp5589_read(client, ADP5589_5_ID);
-	if (ret < 0) {
-		error = ret;
+	if (ret < 0)
 		goto err_free_mem;
-	}
 
 	revid = (u8) ret & ADP5589_5_DEVICE_ID_MASK;
 
 	if (pdata->keymapsize) {
-		error = adp5589_keypad_add(kpad, revid);
-		if (error)
+		ret = adp5589_keypad_add(kpad, revid);
+		if (ret)
 			goto err_free_mem;
 	}
 
-	error = adp5589_setup(kpad);
-	if (error)
+	ret = adp5589_setup(kpad);
+	if (ret)
 		goto err_keypad_remove;
 
 	if (kpad->gpimapsize)
 		adp5589_report_switch_state(kpad);
 
-	error = adp5589_gpio_add(kpad);
-	if (error)
+	ret = adp5589_gpio_add(kpad);
+	if (ret)
 		goto err_keypad_remove;
 
 	i2c_set_clientdata(client, kpad);
@@ -1085,7 +1083,7 @@ err_keypad_remove:
 err_free_mem:
 	kfree(kpad);
 
-	return error;
+	return ret;
 }
 
 static int adp5589_remove(struct i2c_client *client)
