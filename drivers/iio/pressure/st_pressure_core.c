@@ -567,14 +567,15 @@ static int st_press_write_raw(struct iio_dev *indio_dev,
 			      long mask)
 {
 	int err;
+	struct st_sensor_data *press_data = iio_priv(indio_dev);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		if (val2)
 			return -EINVAL;
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&press_data->lock);
 		err = st_sensors_set_odr(indio_dev, val);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&press_data->lock);
 		return err;
 	default:
 		return -EINVAL;
