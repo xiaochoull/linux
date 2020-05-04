@@ -117,6 +117,8 @@ struct imx7d_adc {
 	struct imx7d_adc_feature adc_feature;
 
 	struct completion completion;
+
+	struct mutex lock;
 };
 
 struct imx7d_adc_analogue_core_clk {
@@ -292,7 +294,7 @@ static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&info->lock);
 		reinit_completion(&info->completion);
 
 		channel = chan->channel & 0x03;
@@ -302,16 +304,16 @@ static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
 		ret = wait_for_completion_interruptible_timeout
 				(&info->completion, IMX7D_ADC_TIMEOUT);
 		if (ret == 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return -ETIMEDOUT;
 		}
 		if (ret < 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return ret;
 		}
 
 		*val = info->value;
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&info->lock);
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -519,6 +521,8 @@ static int imx7d_adc_probe(struct platform_device *pdev)
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = imx7d_adc_iio_channels;
 	indio_dev->num_channels = ARRAY_SIZE(imx7d_adc_iio_channels);
+
+	mutex_init(&info->lock);
 
 	ret = devm_request_irq(dev, irq, imx7d_adc_isr, 0, dev_name(dev), info);
 	if (ret < 0) {
