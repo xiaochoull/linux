@@ -131,6 +131,7 @@ static int itg3200_write_raw(struct iio_dev *indio_dev,
 			     int val2,
 			     long mask)
 {
+	struct itg3200 *st = iio_priv(indio_dev);
 	int ret;
 	u8 t;
 
@@ -139,11 +140,11 @@ static int itg3200_write_raw(struct iio_dev *indio_dev,
 		if (val == 0 || val2 != 0)
 			return -EINVAL;
 
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&st->lock);
 
 		ret = itg3200_read_reg_8(indio_dev, ITG3200_REG_DLPF, &t);
 		if (ret) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&st->lock);
 			return ret;
 		}
 		t = ((t & ITG3200_DLPF_CFG_MASK) ? 1000u : 8000u) / val - 1;
@@ -152,7 +153,7 @@ static int itg3200_write_raw(struct iio_dev *indio_dev,
 					  ITG3200_REG_SAMPLE_RATE_DIV,
 					  t);
 
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&st->lock);
 		return ret;
 
 	default:
@@ -322,6 +323,8 @@ static int itg3200_probe(struct i2c_client *client,
 	indio_dev->available_scan_masks = itg3200_available_scan_masks;
 	indio_dev->info = &itg3200_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
+
+	mutex_init(&st->lock);
 
 	ret = itg3200_buffer_configure(indio_dev);
 	if (ret)
