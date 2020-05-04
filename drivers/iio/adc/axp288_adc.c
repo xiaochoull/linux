@@ -51,6 +51,7 @@ struct axp288_adc_info {
 	int irq;
 	struct regmap *regmap;
 	bool ts_enabled;
+	struct mutex lock;
 };
 
 static const struct iio_chan_spec axp288_adc_channels[] = {
@@ -161,7 +162,7 @@ static int axp288_adc_read_raw(struct iio_dev *indio_dev,
 	int ret;
 	struct axp288_adc_info *info = iio_priv(indio_dev);
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&info->lock);
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
 		if (axp288_adc_set_ts(info, AXP288_ADC_TS_CURRENT_ON_ONDEMAND,
@@ -178,7 +179,7 @@ static int axp288_adc_read_raw(struct iio_dev *indio_dev,
 	default:
 		ret = -EINVAL;
 	}
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&info->lock);
 
 	return ret;
 }
@@ -276,6 +277,9 @@ static int axp288_adc_probe(struct platform_device *pdev)
 	indio_dev->num_channels = ARRAY_SIZE(axp288_adc_channels);
 	indio_dev->info = &axp288_adc_iio_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
+
+	mutex_init(&info->lock);
+
 	ret = iio_map_array_register(indio_dev, axp288_adc_default_maps);
 	if (ret < 0)
 		return ret;
