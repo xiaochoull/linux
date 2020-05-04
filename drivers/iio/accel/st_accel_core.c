@@ -1016,6 +1016,7 @@ static int st_accel_write_raw(struct iio_dev *indio_dev,
 		struct iio_chan_spec const *chan, int val, int val2, long mask)
 {
 	int err;
+	struct st_sensor_data *adata = iio_priv(indio_dev);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE: {
@@ -1028,9 +1029,9 @@ static int st_accel_write_raw(struct iio_dev *indio_dev,
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		if (val2)
 			return -EINVAL;
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&adata->lock);
 		err = st_sensors_set_odr(indio_dev, val);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&adata->lock);
 		return err;
 	default:
 		return -EINVAL;
