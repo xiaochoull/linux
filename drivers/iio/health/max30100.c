@@ -71,6 +71,7 @@ struct max30100_data {
 	struct i2c_client *client;
 	struct iio_dev *indio_dev;
 	struct mutex lock;
+	struct mutex mlock;
 	struct regmap *regmap;
 
 	__be16 buffer[2]; /* 2 16-bit channels */
@@ -387,7 +388,7 @@ static int max30100_read_raw(struct iio_dev *indio_dev,
 		 * Temperature reading can only be acquired while engine
 		 * is running
 		 */
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&data->mlock);
 
 		if (!iio_buffer_enabled(indio_dev))
 			ret = -EAGAIN;
@@ -398,7 +399,7 @@ static int max30100_read_raw(struct iio_dev *indio_dev,
 
 		}
 
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&data->mlock);
 		break;
 	case IIO_CHAN_INFO_SCALE:
 		*val = 1;  /* 0.0625 */
@@ -445,6 +446,7 @@ static int max30100_probe(struct i2c_client *client,
 	data->client = client;
 
 	mutex_init(&data->lock);
+	mutex_init(&data->mlock);
 	i2c_set_clientdata(client, indio_dev);
 
 	data->regmap = devm_regmap_init_i2c(client, &max30100_regmap_config);
