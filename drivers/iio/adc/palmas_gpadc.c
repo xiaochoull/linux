@@ -110,6 +110,7 @@ struct palmas_gpadc {
 	bool				wakeup1_enable;
 	bool				wakeup2_enable;
 	int				auto_conversion_period;
+	struct mutex			lock;
 };
 
 /*
@@ -388,7 +389,7 @@ static int palmas_gpadc_read_raw(struct iio_dev *indio_dev,
 	if (adc_chan > PALMAS_ADC_CH_MAX)
 		return -EINVAL;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&adc->lock);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
@@ -414,12 +415,12 @@ static int palmas_gpadc_read_raw(struct iio_dev *indio_dev,
 		goto out;
 	}
 
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&adc->lock);
 	return ret;
 
 out:
 	palmas_gpadc_read_done(adc, adc_chan);
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&adc->lock);
 
 	return ret;
 }
@@ -516,6 +517,9 @@ static int palmas_gpadc_probe(struct platform_device *pdev)
 	adc->dev = &pdev->dev;
 	adc->palmas = dev_get_drvdata(pdev->dev.parent);
 	adc->adc_info = palmas_gpadc_info;
+
+	mutex_init(&adc->lock);
+
 	init_completion(&adc->conv_completion);
 	dev_set_drvdata(&pdev->dev, indio_dev);
 
