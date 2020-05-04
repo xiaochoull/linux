@@ -282,6 +282,7 @@ struct meson_sar_adc_priv {
 	bool					temperature_sensor_calibrated;
 	u8					temperature_sensor_coefficient;
 	u16					temperature_sensor_adc_val;
+	struct mutex				lock;
 };
 
 static const struct regmap_config meson_sar_adc_regmap_config_gxbb = {
@@ -492,7 +493,7 @@ static int meson_sar_adc_lock(struct iio_dev *indio_dev)
 	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
 	int val, timeout = 10000;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&priv->lock);
 
 	if (priv->param->has_bl30_integration) {
 		/* prevent BL30 from using the SAR ADC while we are using it */
@@ -510,7 +511,7 @@ static int meson_sar_adc_lock(struct iio_dev *indio_dev)
 		} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
 
 		if (timeout < 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&priv->lock);
 			return -ETIMEDOUT;
 		}
 	}
@@ -527,7 +528,7 @@ static void meson_sar_adc_unlock(struct iio_dev *indio_dev)
 		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
 				MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
 
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&priv->lock);
 }
 
 static void meson_sar_adc_clear_fifo(struct iio_dev *indio_dev)
@@ -1210,6 +1211,8 @@ static int meson_sar_adc_probe(struct platform_device *pdev)
 	indio_dev->name = match_data->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->info = &meson_sar_adc_iio_info;
+
+	mutex_init(&priv->lock);
 
 	base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(base))
