@@ -104,6 +104,7 @@ struct max30102_data {
 	struct i2c_client *client;
 	struct iio_dev *indio_dev;
 	struct mutex lock;
+	struct mutex mlock;
 	struct regmap *regmap;
 	enum max30102_chip_id chip_id;
 
@@ -478,12 +479,12 @@ static int max30102_read_raw(struct iio_dev *indio_dev,
 		 * Temperature reading can only be acquired when not in
 		 * shutdown; leave shutdown briefly when buffer not running
 		 */
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&data->mlock);
 		if (!iio_buffer_enabled(indio_dev))
 			ret = max30102_get_temp(data, val, true);
 		else
 			ret = max30102_get_temp(data, val, false);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&data->mlock);
 		if (ret)
 			return ret;
 
@@ -533,6 +534,7 @@ static int max30102_probe(struct i2c_client *client,
 	data->chip_id = id->driver_data;
 
 	mutex_init(&data->lock);
+	mutex_init(&data->mlock);
 	i2c_set_clientdata(client, indio_dev);
 
 	switch (data->chip_id) {
