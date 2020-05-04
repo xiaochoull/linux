@@ -6,6 +6,7 @@
 
 struct ltc2497core_driverdata {
 	struct regulator *ref;
+	struct mutex lock;
 	ktime_t	time_prev;
 	u8 addr_prev;
 	int (*result_and_measure)(struct ltc2497core_driverdata *ddata,

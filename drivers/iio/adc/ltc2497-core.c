@@ -81,9 +81,9 @@ static int ltc2497core_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&ddata->lock);
 		ret = ltc2497core_read(ddata, chan->address, val);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&ddata->lock);
 		if (ret < 0)
 			return ret;
 
@@ -194,6 +194,8 @@ int ltc2497core_probe(struct device *dev, struct iio_dev *indio_dev)
 			ERR_PTR(ret));
 		return ret;
 	}
+
+	mutex_init(&ddata->lock);
 
 	if (dev->platform_data) {
 		struct iio_map *plat_data;
