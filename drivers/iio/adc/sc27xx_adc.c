@@ -75,6 +75,7 @@ struct sc27xx_adc_data {
 	 * subsystems which will access the unique ADC controller.
 	 */
 	struct hwspinlock *hwlock;
+	struct mutex lock;
 	int channel_scale[SC27XX_ADC_CHANNEL_MAX];
 	u32 base;
 	int irq;
@@ -333,9 +334,9 @@ static int sc27xx_adc_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&data->lock);
 		ret = sc27xx_adc_read(data, chan->channel, scale, &tmp);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&data->lock);
 
 		if (ret)
 			return ret;
@@ -344,10 +345,10 @@ static int sc27xx_adc_read_raw(struct iio_dev *indio_dev,
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_PROCESSED:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&data->lock);
 		ret = sc27xx_adc_read_processed(data, chan->channel, scale,
 						&tmp);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&data->lock);
 
 		if (ret)
 			return ret;
@@ -518,6 +519,8 @@ static int sc27xx_adc_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to request hwspinlock\n");
 		return -ENXIO;
 	}
+
+	mutex_init(&sc27xx_data->lock);
 
 	sc27xx_data->dev = dev;
 
