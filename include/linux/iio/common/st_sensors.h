@@ -228,6 +228,7 @@ struct st_sensor_settings {
  * @hw_irq_trigger: if we're using the hardware interrupt on the sensor.
  * @hw_timestamp: Latest timestamp from the interrupt handler, when in use.
  * @buffer_data: Data used by buffer part.
+ * @lock: lock to protect the data buffer during read/write ops
  */
 struct st_sensor_data {
 	struct device *dev;
@@ -238,6 +239,7 @@ struct st_sensor_data {
 	struct regulator *vdd;
 	struct regulator *vdd_io;
 	struct regmap *regmap;
+	struct mutex lock;
 
 	bool enabled;
 
