@@ -38,6 +38,7 @@ struct mx25_gcq_priv {
 	struct completion completed;
 	struct clk *clk;
 	int irq;
+	struct mutex lock;
 	struct regulator *vref[4];
 	u32 channel_vref_mv[MX25_NUM_CFGS];
 };
@@ -137,9 +138,9 @@ static int mx25_gcq_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&priv->lock);
 		ret = mx25_gcq_get_raw_value(&indio_dev->dev, chan, priv, val);
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&priv->lock);
 		return ret;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -313,6 +314,8 @@ static int mx25_gcq_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to initialize regmap\n");
 		return PTR_ERR(priv->regs);
 	}
+
+	mutex_init(&priv->lock);
 
 	init_completion(&priv->completed);
 
