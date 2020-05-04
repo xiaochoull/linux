@@ -130,6 +130,8 @@ struct ad799x_state {
 
 	u8				*rx_buf;
 	unsigned int			transfer_size;
+
+	struct mutex			lock;
 };
 
 static int ad799x_write_config(struct ad799x_state *st, u16 val)
@@ -353,7 +355,7 @@ static ssize_t ad799x_write_frequency(struct device *dev,
 	if (ret)
 		return ret;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&st->lock);
 	ret = i2c_smbus_read_byte_data(st->client, AD7998_CYCLE_TMR_REG);
 	if (ret < 0)
 		goto error_ret_mutex;
@@ -375,7 +377,7 @@ static ssize_t ad799x_write_frequency(struct device *dev,
 	ret = len;
 
 error_ret_mutex:
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&st->lock);
 
 	return ret;
 }
@@ -456,11 +458,11 @@ static int ad799x_write_event_value(struct iio_dev *indio_dev,
 	if (val < 0 || val > GENMASK(chan->scan_type.realbits - 1, 0))
 		return -EINVAL;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&st->lock);
 	ret = i2c_smbus_write_word_swapped(st->client,
 		ad799x_threshold_reg(chan, dir, info),
 		val << chan->scan_type.shift);
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&st->lock);
 
 	return ret;
 }
@@ -475,10 +477,10 @@ static int ad799x_read_event_value(struct iio_dev *indio_dev,
 	int ret;
 	struct ad799x_state *st = iio_priv(indio_dev);
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&st->lock);
 	ret = i2c_smbus_read_word_swapped(st->client,
 		ad799x_threshold_reg(chan, dir, info));
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&st->lock);
 	if (ret < 0)
 		return ret;
 	*val = (ret >> chan->scan_type.shift) &
@@ -820,6 +822,8 @@ static int ad799x_probe(struct i2c_client *client,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = st->chip_config->channel;
 	indio_dev->num_channels = chip_info->num_channels;
+
+	mutex_init(&st->lock);
 
 	ret = ad799x_update_config(st, st->chip_config->default_config);
 	if (ret)
