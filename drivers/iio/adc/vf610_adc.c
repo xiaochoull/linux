@@ -168,6 +168,8 @@ struct vf610_adc {
 
 	struct completion completion;
 	u16 buffer[8];
+
+	struct mutex lock;
 };
 
 static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
@@ -464,11 +466,11 @@ static int vf610_set_conversion_mode(struct iio_dev *indio_dev,
 {
 	struct vf610_adc *info = iio_priv(indio_dev);
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&info->lock);
 	info->adc_feature.conv_mode = mode;
 	vf610_adc_calculate_rates(info);
 	vf610_adc_hw_init(info);
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&info->lock);
 
 	return 0;
 }
@@ -632,9 +634,9 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
 	case IIO_CHAN_INFO_PROCESSED:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&info->lock);
 		if (iio_buffer_enabled(indio_dev)) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return -EBUSY;
 		}
 
@@ -645,11 +647,11 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 		ret = wait_for_completion_interruptible_timeout
 				(&info->completion, VF610_ADC_TIMEOUT);
 		if (ret == 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return -ETIMEDOUT;
 		}
 		if (ret < 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return ret;
 		}
 
@@ -668,11 +670,11 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
 
 			break;
 		default:
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return -EINVAL;
 		}
 
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&info->lock);
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -807,6 +809,9 @@ static int vf610_adc_probe(struct platform_device *pdev)
 	}
 
 	info = iio_priv(indio_dev);
+
+	mutex_init(&info->lock);
+
 	info->dev = &pdev->dev;
 
 	info->regs = devm_platform_ioremap_resource(pdev, 0);
