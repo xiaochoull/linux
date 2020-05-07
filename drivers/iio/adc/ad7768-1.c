@@ -164,6 +164,7 @@ struct ad7768_state {
 	struct completion completion;
 	struct iio_trigger *trig;
 	struct gpio_desc *gpio_sync_in;
+	struct gpio_desc *gpio_reset;
 	bool spi_engine_supported;
 	bool spi_locked;
 	/*
@@ -467,6 +468,13 @@ static const struct iio_info ad7768_info = {
 static int ad7768_setup(struct ad7768_state *st)
 {
 	int ret;
+
+	st->gpio_reset = devm_gpiod_get(&st->spi->dev, "reset",
+					  GPIOD_OUT_LOW);
+	if (IS_ERR(st->gpio_reset))
+		return PTR_ERR(st->gpio_reset);
+
+	gpiod_direction_output(st->gpio_reset, 0);
 
 	/*
 	 * Two writes to the SPI_RESET[1:0] bits are required to initiate
