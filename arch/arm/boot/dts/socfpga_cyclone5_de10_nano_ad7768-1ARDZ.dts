@@ -56,6 +56,7 @@
 };
 
 &i2c0 {
+	clock-frequency = <100000>;
 	ltc2606: ltc2606@0x10 {
 		compatible = "adi,ltc2606";
 		reg = <0x10>;
