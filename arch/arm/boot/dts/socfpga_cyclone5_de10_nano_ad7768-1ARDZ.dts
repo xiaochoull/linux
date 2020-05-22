@@ -84,6 +84,28 @@
 		resetvalue = <0>;
 		#gpio-cells = <2>;
 		gpio-controller;
+
+		cn0540_blue_led{
+			gpios = <8 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "cn0540_blue_led";
+		};
+		cn0540_red_led{
+			gpios = <7 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "cn0540_red_led";
+		};
+		cn0540_sw_ff_gpio{
+			gpios = <6 GPIO_ACTIVE_HIGH>;
+			output-high;
+			line-name = "cn0540_sw_ff_gpio";
+		};
+		cn0540_shutdown_gpio{
+			gpio-hog;
+			gpios = <4 GPIO_ACTIVE_HIGH>;
+			output-high;
+			line-name = "cn0540_shutdown_gpio";
+		};
 	};
 
 	axi_dmac_0: rx-dma@0x00020000 {
