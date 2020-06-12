@@ -46,6 +46,7 @@ config KERNEL_ALL_ADI_DRIVERS
 	select AD525X_DPOT_I2C
 	select AD525X_DPOT_SPI
 	select ADIN_PHY
+	select ADIN_T1L_PHY
 	select GPIO_ADP5588
 	select GPIO_ADP5588_IRQ
 	select GPIO_ADP5520
