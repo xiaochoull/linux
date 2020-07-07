@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Analog Devices IIO_GPIO
+ * Analog Devices ONE_BIT_ADC_DAC
  * Digital to Analog Converters driver
  *
  * Copyright 2019 Analog Devices Inc.
@@ -17,13 +17,13 @@ enum {
 	CH_OUT,
 };
 
-struct iio_gpio_state {
+struct one_bit_adc_dac_state {
 	struct platform_device 	*pdev;
 	struct gpio_descs	*in_gpio_descs;
 	struct gpio_descs	*out_gpio_descs;
 };
 
- #define IIO_GPIO_CHANNEL(idx, direction)				\
+ #define ONE_BIT_ADC_DAC_CHANNEL(idx, direction)			\
 	{								\
 		.type = IIO_VOLTAGE,					\
 		.indexed = 1,						\
@@ -32,10 +32,10 @@ struct iio_gpio_state {
 		.output = direction,					\
 	}
 
-static int iio_gpio_read_raw(struct iio_dev *indio_dev,
+static int one_bit_adc_dac_read_raw(struct iio_dev *indio_dev,
 	const struct iio_chan_spec *chan, int *val, int *val2, long info)
 {
-	struct iio_gpio_state *st = iio_priv(indio_dev);
+	struct one_bit_adc_dac_state *st = iio_priv(indio_dev);
 	int channel = chan->channel;
 
 	switch (info) {
@@ -49,23 +49,23 @@ static int iio_gpio_read_raw(struct iio_dev *indio_dev,
 			*val = gpiod_get_value_cansleep(
 				st->out_gpio_descs->desc[channel]);
 		}
-		printk("iio_gpio_read_raw val: %d\n", *val);
+		printk("one_bit_adc_dac_read_raw val: %d\n", *val);
  		return IIO_VAL_INT;
 	default:
 		return -EINVAL;
 	}
 }
 
-static int iio_gpio_write_raw(struct iio_dev *indio_dev,
+static int one_bit_adc_dac_write_raw(struct iio_dev *indio_dev,
 			    struct iio_chan_spec const *chan,
 			    int val,
 			    int val2,
 			    long info)
 {
-	struct iio_gpio_state *st = iio_priv(indio_dev);
+	struct one_bit_adc_dac_state *st = iio_priv(indio_dev);
 	int channel = chan->channel;
 
-	printk("iio_gpio_write_raw val: %d val2: %d\n", val, val2);
+	printk("one_bit_adc_dac_write_raw val: %d val2: %d\n", val, val2);
 	
 	switch (info) {
 	case IIO_CHAN_INFO_RAW:
@@ -85,18 +85,18 @@ static int iio_gpio_write_raw(struct iio_dev *indio_dev,
 	}
 }
 
-static const struct iio_info iio_gpio_info = {
-	.read_raw = &iio_gpio_read_raw,
-	.write_raw = &iio_gpio_write_raw,
+static const struct iio_info one_bit_adc_dac_info = {
+	.read_raw = &one_bit_adc_dac_read_raw,
+	.write_raw = &one_bit_adc_dac_write_raw,
 };
 
-static int iio_gpio_parse_dt(struct iio_dev *indio_dev)
+static int one_bit_adc_dac_parse_dt(struct iio_dev *indio_dev)
 {
-	struct iio_gpio_state *st = iio_priv(indio_dev);
-	static struct iio_chan_spec *iio_gpio_channels;
+	struct one_bit_adc_dac_state *st = iio_priv(indio_dev);
+	static struct iio_chan_spec *channels;
 	const char **out_gpio_names;
 	const char **in_gpio_names;
-	int ret, i, offset, channels;
+	int ret, i, offset, num_channels;
 	struct iio_chan_spec chan_spec;
 	
 	st->in_gpio_descs = devm_gpiod_get_array_optional(&st->pdev->dev, 
@@ -120,10 +120,10 @@ static int iio_gpio_parse_dt(struct iio_dev *indio_dev)
 	if (!out_gpio_names)
 		return -ENOMEM;
 
-	channels = st->in_gpio_descs->ndescs + st->out_gpio_descs->ndescs;
-	iio_gpio_channels = kcalloc(channels,
+	num_channels = st->in_gpio_descs->ndescs + st->out_gpio_descs->ndescs;
+	channels = kcalloc(num_channels,
 				sizeof(struct iio_chan_spec), GFP_KERNEL);
-	if (!iio_gpio_channels)
+	if (!channels)
 		return -ENOMEM;
 
 	ret = device_property_read_string_array(&st->pdev->dev,
@@ -141,33 +141,34 @@ static int iio_gpio_parse_dt(struct iio_dev *indio_dev)
 		return ret;
 
 	for (i = 0; i < st->in_gpio_descs->ndescs; i++) {
-		chan_spec = (struct iio_chan_spec)IIO_GPIO_CHANNEL(i, CH_IN);
-		iio_gpio_channels[i] = chan_spec;
-		iio_gpio_channels[i].extend_name = in_gpio_names[i];
+		chan_spec = (struct iio_chan_spec)ONE_BIT_ADC_DAC_CHANNEL(i,
+                                                                CH_IN);
+		channels[i] = chan_spec;
+		channels[i].extend_name = in_gpio_names[i];
 	}
 
 	for (i = 0; i < st->out_gpio_descs->ndescs; i++) {
 		offset = st->in_gpio_descs->ndescs;
-		chan_spec = (struct iio_chan_spec)IIO_GPIO_CHANNEL(offset + i,
-								CH_OUT);
-		iio_gpio_channels[offset + i] = chan_spec;
-		iio_gpio_channels[offset + i].extend_name = out_gpio_names[i];
+		chan_spec = (struct iio_chan_spec)ONE_BIT_ADC_DAC_CHANNEL(offset
+                                                        + i, CH_OUT);
+		channels[offset + i] = chan_spec;
+		channels[offset + i].extend_name = out_gpio_names[i];
 	}
 	kfree(in_gpio_names);
 	kfree(out_gpio_names);
-	indio_dev->channels = iio_gpio_channels;
-	indio_dev->num_channels = channels;
+	indio_dev->channels = channels;
+	indio_dev->num_channels = num_channels;
 
 	return 0;
 }
 
-static int iio_gpio_probe(struct platform_device *pdev)
+static int one_bit_adc_dac_probe(struct platform_device *pdev)
 {
 	struct iio_dev *indio_dev;
-	struct iio_gpio_state *st;
+	struct one_bit_adc_dac_state *st;
 	int ret;
 
-	printk("iio-gpio_probe test_crx\n");
+	printk("one-bit-adc-dac-teodorex\n");
  	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*st));
 	if (!indio_dev)
 		return -ENOMEM;
@@ -175,11 +176,11 @@ static int iio_gpio_probe(struct platform_device *pdev)
 	st = iio_priv(indio_dev);
 	st->pdev = pdev;
 	indio_dev->dev.parent = &pdev->dev;
-	indio_dev->name = "iio-gpio";
+	indio_dev->name = "one-bit-adc-dac";
 	indio_dev->modes = INDIO_DIRECT_MODE;
-	indio_dev->info = &iio_gpio_info;
+	indio_dev->info = &one_bit_adc_dac_info;
 
-	ret = iio_gpio_parse_dt(indio_dev);
+	ret = one_bit_adc_dac_parse_dt(indio_dev);
 	if (ret < 0)
 		return ret;
 
@@ -187,7 +188,7 @@ static int iio_gpio_probe(struct platform_device *pdev)
 	return iio_device_register(indio_dev);
 }
 
-static int iio_gpio_remove(struct platform_device *pdev)
+static int one_bit_adc_dac_remove(struct platform_device *pdev)
 {
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
 	iio_device_unregister(indio_dev);
@@ -196,24 +197,24 @@ static int iio_gpio_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id iio_gpio_dt_match[] = {
-	{ .compatible = "adi,iio-gpio" },
+static const struct of_device_id one_bit_adc_dac_dt_match[] = {
+	{ .compatible = "adi,one-bit-adc-dac" },
 	{},
 };
 
-MODULE_DEVICE_TABLE(of, iio_gpio_dt_match);
+MODULE_DEVICE_TABLE(of, one_bit_adc_dac_dt_match);
 
-static struct platform_driver iio_gpio_driver = {
+static struct platform_driver one_bit_adc_dac_driver = {
 	.driver = {
-		.name = "iio-gpio",
-		.of_match_table = iio_gpio_dt_match,
+		.name = "one-bit-adc-dac",
+		.of_match_table = one_bit_adc_dac_dt_match,
 	},
-	.probe = iio_gpio_probe,
-	.remove = iio_gpio_remove,
+	.probe = one_bit_adc_dac_probe,
+	.remove = one_bit_adc_dac_remove,
 };
 
-module_platform_driver(iio_gpio_driver);
+module_platform_driver(one_bit_adc_dac_driver);
 
 MODULE_AUTHOR("Cristian Pop <cristian.pop@analog.com>");
-MODULE_DESCRIPTION("Analog Devices IIO GPIO");
+MODULE_DESCRIPTION("Analog Devices ONE_BIT_ADC_DAC");
 MODULE_LICENSE("GPL v2");

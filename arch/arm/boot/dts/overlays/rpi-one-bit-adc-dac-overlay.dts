@@ -7,8 +7,8 @@
 	fragment@0 {
 		target-path = "/";
 		__overlay__ {
-			iio-gpio@0 {
-				compatible = "adi,iio-gpio";
+			one-bit-adc-dac@0 {
+				compatible = "adi,one-bit-adc-dac";
 				in-gpios = <&gpio 17 0>, <&gpio 27 0>;
 				input-gpio-names = "i_17", "i_27";
 				out-gpios = <&gpio 23 0>, <&gpio 24 0>;
