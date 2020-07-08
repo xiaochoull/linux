@@ -156,6 +156,8 @@
 			dmas = <&axi_dmac_0 0>;
 			dma-names = "rx";
 			#io-channel-cells = <1>;
+			gpio-controller;
+			#gpio-cells = <1>;
 		};
 	};
 };

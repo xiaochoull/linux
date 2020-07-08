@@ -13,6 +13,8 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/gpio/consumer.h>
+#include <linux/gpio/driver.h>
+#include <linux/gpio.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/regulator/consumer.h>
@@ -82,6 +84,15 @@
 #define AD7768_CONV_MODE_MSK		GENMASK(2, 0)
 #define AD7768_CONV_MODE(x)		FIELD_PREP(AD7768_CONV_MODE_MSK, x)
 
+/* AD7768_REG_GPIO_CONTROL */
+#define AD7768_GPIO_CONTROL_MSK		GENMASK(3, 0)
+
+/* AD7768_REG_GPIO_WRITE */
+#define AD7768_GPIO_WRITE_MSK		GENMASK(3, 0)
+
+/* AD7768_REG_GPIO_READ */
+#define AD7768_GPIO_READ_MSK		GENMASK(3, 0)
+
 #define AD7768_RD_FLAG_MSK(x)		(BIT(6) | ((x) & 0x3F))
 #define AD7768_WR_FLAG_MSK(x)		((x) & 0x3F)
 
@@ -139,7 +150,10 @@ static const struct ad7768_clk_configuration ad7768_clk_config[] = {
 struct ad7768_state {
 	struct spi_device *spi;
 	struct regulator *vref;
+	struct gpio_chip gpiochip;
+	unsigned int gpio_avail_map;
 	struct mutex lock;
+	struct mutex gpio_lock;
 	struct clk *mclk;
 	unsigned int mclk_freq;
 	unsigned int samp_freq;
@@ -218,6 +232,14 @@ static int ad7768_spi_reg_write(struct ad7768_state *st,
 		return spi_sync_locked(st->spi, &msg);
 
 	return spi_sync(st->spi, &msg);
+}
+
+static int ad7768_spi_reg_write_masked(struct ad7768_state *st,
+				       unsigned int addr,
+				       unsigned int mask,
+				       unsigned int val)
+{
+	return ad7768_spi_reg_write(st, addr, mask & val);
 }
 
 static int ad7768_set_mode(struct ad7768_state *st,
@@ -312,6 +334,157 @@ static int ad7768_set_dig_fil(struct ad7768_state *st,
 	gpiod_set_value(st->gpio_sync_in, 0);
 
 	return 0;
+}
+
+static int ad7768_gpio_get(struct gpio_chip *chip, unsigned offset)
+{
+	struct ad7768_state *st = gpiochip_get_data(chip);
+	unsigned int val;
+	int ret;
+
+	mutex_lock(&st->gpio_lock);
+	val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_CONTROL, 1);
+	if (val < 0){
+		ret = val;
+		goto gpio_get_err;
+	}
+
+	if (val & BIT(offset)){
+		ret = -EPREM;
+	} else {
+		val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_READ, 1);
+		if (ret < 0)
+			ret = val;
+			goto gpio_get_err;
+		}
+
+		ret = !!(val & BIT(offset));
+	}
+
+gpio_get_err:
+	mutex_unlock(&st->gpio_lock);
+
+	return ret;
+}
+
+static void ad7768_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+{
+	struct ad7768_state *st = gpiochip_get_data(chip);
+	unsigned int val;
+	int ret;
+
+	mutex_lock(&st->gpio_lock);
+	val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_CONTROL, 1);
+	if (val < 0){
+		ret = val;
+		goto gpio_set_err;
+	}
+
+	if (ret & BIT(offset)){
+		val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_WRITE, 1);
+		if (val < 0){
+			ret = val;
+			goto gpio_set_err;
+		}
+
+		if(value)
+			val |= BIT(offset);
+		else
+			val &= ~BIT(offset);
+		ret = ad7768_spi_reg_write_masked(st,
+						  AD7768_REG_GPIO_WRITE,
+						  AD7768_GPIO_WRITE_MSK,
+						  val);
+		if (ret < 0)
+			goto gpio_set_err;
+	} else {
+		ret = -EPREM;
+	}
+
+gpio_set_err:
+	mutex_unlock(&st->gpio_lock);
+
+	return ret;
+}
+
+static int ad7768_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+{
+	struct ad7768_state *st = gpiochip_get_data(chip);
+	unsigned int val;
+	int ret;
+
+	mutex_lock(&st->gpio_lock);
+	ret = ad7768_spi_reg_read(st, AD7768_REG_GPIO_CONTROL, 1);
+	if (ret < 0)
+		goto gpio_dir_in_err;
+	ret &= ~BIT(offset);
+	ret = ad7768_spi_reg_write_masked(st,
+					  AD7768_REG_GPIO_CONTROL,
+					  AD7768_GPIO_CONTROL_MSK,
+					  ret);
+	if (ret < 0)
+		goto gpio_dir_in_err;
+
+
+gpio_dir_in_err:
+	mutex_unlock(&st->gpio_lock);
+
+	return ret;
+
+static int ad7768_gpio_direction_output(struct gpio_chip *chip,
+					 unsigned offset, int value)
+{
+	struct ad7768_state *st = gpiochip_get_data(chip);
+	unsigned int val;
+	int ret;
+
+	mutex_lock(&st->gpio_lock);
+	ret = ad7768_spi_reg_read(st, AD7768_REG_GPIO_CONTROL, 1);
+	if (ret < 0)
+		goto gpio_dir_out_err;
+	ret |= BIT(offset);
+	ret = ad7768_spi_reg_write_masked(st,
+					  AD7768_REG_GPIO_CONTROL,
+					  AD7768_GPIO_CONTROL_MSK,
+					  ret);
+	if (ret < 0)
+		goto gpio_dir_out_err;
+
+
+gpio_dir_out_err:
+	mutex_unlock(&st->gpio_lock);
+
+	return ret;
+}
+
+static int ad7768_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	struct ad5592r_state *st = gpiochip_get_data(chip);
+
+	if (st->gpio_avail_map & BIT(offset))
+		st->gpio_avail_map &= ~BIT(offset);
+	else
+		return -ENODEV;
+
+	return 0;
+}
+static int ad7768_gpio_init(struct ad7768_state *st)
+{
+	st->gpio_avail_map = AD7768_GPIO_CONTROL_MSK;
+	st->gpiochip.label = dev_name(st->dev);
+	st->gpiochip.base = -1;
+	st->gpiochip.ngpio = 4;
+	st->gpiochip.parent = st->dev;
+	st->gpiochip.can_sleep = false;
+	st->gpiochip.direction_input = ad7768_gpio_direction_input;
+	st->gpiochip.direction_output = ad7768_gpio_direction_output;
+	st->gpiochip.get = ad7768_gpio_get;
+	st->gpiochip.set = ad7768_gpio_set;
+	st->gpiochip.request = ad7768_gpio_request;
+	st->gpiochip.owner = THIS_MODULE;
+	mutex_init(&st->gpio_lock);
+
+	return gpiochip_add_data(&st->gpiochip, st);
 }
 
 static int ad7768_set_freq(struct ad7768_state *st,
@@ -633,6 +806,9 @@ static int ad7768_buffer_predisable(struct iio_dev *indio_dev)
 		return ad7768_spi_reg_read(st, AD7768_REG_ADC_DATA, 3);
 	}
 }
+
+static int ad7768_gpio_direction_input(struct ad7768_state *st)
+
 static int hw_submit_block(struct iio_dma_buffer_queue *queue,
 			   struct iio_dma_buffer_block *block)
 {
@@ -743,6 +919,10 @@ static int ad7768_probe(struct spi_device *spi)
 	spi_buffer_mode = st->spi_engine_supported ? INDIO_BUFFER_HARDWARE :
 						     INDIO_BUFFER_TRIGGERED;
 	indio_dev->modes = INDIO_DIRECT_MODE | spi_buffer_mode;
+
+	ret = ad7768_gpio_init(st);
+	if (ret < 0)
+		return ret;
 
 	ret = ad7768_setup(st);
 	if (ret < 0) {
