@@ -656,7 +656,6 @@ static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
-	int ret;
 
 	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
 
@@ -699,7 +698,7 @@ static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+	//struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 
 	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
 
