@@ -515,6 +515,21 @@ static ssize_t hmc7044_show(struct device *dev,
 	return ret;
 }
 
+static int hmc7044_sync_pin_set(struct iio_dev *indio_dev, unsigned mode)
+{
+	u32 val;
+	int ret;
+
+	ret = hmc7044_read(indio_dev, HMC7044_REG_GLOB_MODE, &val);
+	if (ret < 0)
+		return ret;
+
+	val &= ~HMC7044_SYNC_PIN_MODE(~0);
+	val |= HMC7044_SYNC_PIN_MODE(mode);
+
+	return  hmc7044_write(indio_dev, HMC7044_REG_GLOB_MODE, val);
+}
+
 static ssize_t hmc7044_sync_pin_mode_store(struct device *dev,
 			     struct device_attribute *attr,
 			     const char *buf, size_t len)
@@ -522,21 +537,11 @@ static ssize_t hmc7044_sync_pin_mode_store(struct device *dev,
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
 	int i, ret = -EINVAL;
-	u32 val;
 
 	i = sysfs_match_string(sync_pin_modes, buf);
 	if (i >= 0) {
 		mutex_lock(&hmc->lock);
-		ret = hmc7044_read(indio_dev, HMC7044_REG_GLOB_MODE, &val);
-		if (ret < 0) {
-			mutex_unlock(&hmc->lock);
-			return ret;
-		}
-
-		val &= ~HMC7044_SYNC_PIN_MODE(~0);
-		val |= HMC7044_SYNC_PIN_MODE(i);
-
-		ret = hmc7044_write(indio_dev, HMC7044_REG_GLOB_MODE, val);
+		ret = hmc7044_sync_pin_set(indio_dev, i);
 		mutex_unlock(&hmc->lock);
 	}
 
@@ -1498,6 +1503,36 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
+static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct hmc7044 *hmc = iio_priv(indio_dev);
+	int ret;
+	u32 val;
+
+	dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, link_num);
+
+	mutex_lock(&hmc->lock);
+
+	ret = hmc7044_read(indio_dev, HMC7044_REG_REQ_MODE_0, &val);
+	if (ret < 0) {
+		mutex_unlock(&hmc->lock);
+		return ret;
+	}
+
+	hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0,
+		val | HMC7044_PULSE_GEN_REQ);
+
+	ret = hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0, val);
+
+	mutex_unlock(&hmc->lock);
+
+	return ret < 0 ? ret : JESD204_STATE_CHANGE_DONE;
+}
+
 static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1508,16 +1543,21 @@ static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 
 	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
 
-	if (hmc->is_sysref_provider)
-		mask = HMC7044_RESEED_REQ;
-	else
+	if (hmc->is_sysref_provider) {
+		if (hmc->device_id == HMC7044)
+			hmc7044_sync_pin_set(indio_dev, HMC7044_SYNC_PIN_DISABLED);
+
 		mask = HMC7044_RESTART_DIV_FSM;
+	} else {
+		if (hmc->device_id == HMC7044)
+			hmc7044_sync_pin_set(indio_dev, HMC7044_SYNC_PIN_SYNC);
+
+		mask = HMC7044_RESTART_DIV_FSM | HMC7044_RESEED_REQ;
+	}
 
 	ret = hmc7044_read(indio_dev, HMC7044_REG_REQ_MODE_0, &val);
-	if (ret < 0) {
-		mutex_unlock(&hmc->lock);
+	if (ret < 0)
 		return ret;
-	}
 
 	hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0,
 		val | mask);
@@ -1533,6 +1573,16 @@ static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 
 static int hmc7044_jesd204_clks_sync2(struct jesd204_dev *jdev)
 {
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct hmc7044 *hmc = iio_priv(indio_dev);
+
+	if (hmc->is_sysref_provider) {
+		int ret =  hmc7044_jesd204_sysref(jdev, 0, NULL);
+		msleep(2);
+		return ret;
+	}
+
 	return JESD204_STATE_CHANGE_DONE;
 }
 
@@ -1547,14 +1597,17 @@ static int hmc7044_jesd204_clks_sync3(struct jesd204_dev *jdev)
 	if (hmc->is_sysref_provider)
 		return JESD204_STATE_CHANGE_DONE;
 
-	msleep(1);
-
 	ret = hmc7044_read(indio_dev, HMC7044_REG_ALARM_READBACK, &val);
 	if (ret < 0)
 		return ret;
 
-	if (HMC7044_CLK_OUT_PH_STATUS(val))
-		dev_err(dev, "%s: SYSREF of the HMC7044 is not valid; that is, its phase output is not stable\n",__func__);
+	if (!HMC7044_CLK_OUT_PH_STATUS(val))
+		dev_err(dev,
+			"%s: SYSREF of the HMC7044 is not valid; that is, its phase output is not stable (0x%X)\n",
+			__func__, val & 0xFF);
+
+	if (hmc->device_id == HMC7044)
+		hmc7044_sync_pin_set(indio_dev, HMC7044_SYNC_PIN_PULSE_GEN_REQ);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
@@ -1605,36 +1658,6 @@ static int hmc7044_jesd204_link_pre_setup(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct iio_dev *indio_dev = dev_get_drvdata(dev);
-	struct hmc7044 *hmc = iio_priv(indio_dev);
-	int ret;
-	u32 val;
-
-	dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, link_num);
-
-	mutex_lock(&hmc->lock);
-
-	ret = hmc7044_read(indio_dev, HMC7044_REG_REQ_MODE_0, &val);
-	if (ret < 0) {
-		mutex_unlock(&hmc->lock);
-		return ret;
-	}
-
-	hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0,
-		val | HMC7044_PULSE_GEN_REQ);
-
-	ret = hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0, val);
-
-	mutex_unlock(&hmc->lock);
-
-	return ret < 0 ? ret : JESD204_STATE_CHANGE_DONE;
-}
-
 static const struct jesd204_dev_data jesd204_hmc7044_init = {
 	.state_ops = {
 		[JESD204_OP_LINK_SUPPORTED] = {
@@ -1646,7 +1669,7 @@ static const struct jesd204_dev_data jesd204_hmc7044_init = {
 		},
 		[JESD204_OP_CLK_SYNC_STAGE2] = {
 			.per_device = hmc7044_jesd204_clks_sync2,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
 		[JESD204_OP_CLK_SYNC_STAGE3] = {
 			.per_device = hmc7044_jesd204_clks_sync3,
