@@ -13,10 +13,7 @@
 #include "zynqmp-zcu102-rev1.0.dts"
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/iio/frequency/hmc7044.h>
-
-#define DEFRAMER_LINK_TX 0
-#define FRAMER_LINK_RX 1
-#define FRAMER_LINK_ORX 2
+#include <dt-bindings/iio/adc/adi,adrv9009.h>
 
 &i2c1 {
 	i2c-mux@75 {

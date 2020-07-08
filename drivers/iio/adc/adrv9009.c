@@ -55,6 +55,8 @@
 
 #include "adrv9009.h"
 
+#include <dt-bindings/iio/adc/adi,adrv9009.h>
+
 #define FIRMWARE	"TaliseTDDArmFirmware.bin"
 #define FIRMWARE_TX	"TaliseTxArmFirmware.bin"
 #define FIRMWARE_RX	"TaliseRxArmFirmware.bin"
@@ -3411,8 +3413,11 @@ static ssize_t adrv9009_debugfs_write(struct file *file,
 
 		if (phy->jdev) {
 			if(jesd204_dev_is_top(phy->jdev)) {
-				jesd204_fsm_stop(phy->jdev, JESD204_LINKS_ALL);
-				ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
+				int retry = 1;
+				do {
+					jesd204_fsm_stop(phy->jdev, JESD204_LINKS_ALL);
+					ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
+				} while (ret < 0 && retry--);
 			} else {
 				dev_warn(&phy->spi->dev, "initialize ignored: in multichip "
 					"configuration this is only allowed by the top device");
@@ -4751,8 +4756,11 @@ adrv9009_profile_bin_write(struct file *filp, struct kobject *kobj,
 
 	if (phy->jdev) {
 		if (jesd204_dev_is_top(phy->jdev)) {
-			jesd204_fsm_stop(phy->jdev, JESD204_LINKS_ALL);
-			ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
+			int retry = 1;
+			do {
+				jesd204_fsm_stop(phy->jdev, JESD204_LINKS_ALL);
+				ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
+			} while (ret < 0 && retry--);
 		} else {
 			dev_warn(&phy->spi->dev, "initialize ignored: in multichip "
 				"configuration this is only allowed by the top device");
@@ -5178,22 +5186,22 @@ static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 	priv->phy = phy;
 
 	switch (link_num) {
-	case 0:
+	case DEFRAMER_LINK_TX:
 		deframer = &phy->talInit.jesd204Settings.deframerA;
 		lnk->sample_rate = phy->talInit.tx.txProfile.txInputRate_kHz * 1000;
-		priv->link[0].source_id = TAL_DEFRAMER_A;
+		priv->link[DEFRAMER_LINK_TX].source_id = TAL_DEFRAMER_A;
 		break;
-	case 1:
+	case FRAMER_LINK_RX:
 		framer = &phy->talInit.jesd204Settings.framerA;
 		lnk->sample_rate = phy->talInit.rx.rxProfile.rxOutputRate_kHz * 1000;
-		priv->link[1].source_id = TAL_FRAMER_A;
-		priv->link[1].is_framer = true;
+		priv->link[FRAMER_LINK_RX].source_id = TAL_FRAMER_A;
+		priv->link[FRAMER_LINK_RX].is_framer = true;
 		break;
-	case 2:
+	case FRAMER_LINK_ORX:
 		framer = &phy->talInit.jesd204Settings.framerB;
 		lnk->sample_rate = phy->talInit.obsRx.orxProfile.orxOutputRate_kHz * 1000;
-		priv->link[2].source_id = TAL_FRAMER_B;
-		priv->link[2].is_framer = true;
+		priv->link[FRAMER_LINK_ORX].source_id = TAL_FRAMER_B;
+		priv->link[FRAMER_LINK_ORX].is_framer = true;
 		break;
 	default:
 		return -EINVAL;
@@ -5333,10 +5341,10 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 			return -EFAULT;
 		}
 	} else {
-		u8 phy_ctrl;
-		phy_ctrl = adrv9009_spi_read(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1);
-		adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl & ~BIT(7));
-		adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl);
+		// u8 phy_ctrl;
+		// phy_ctrl = adrv9009_spi_read(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1);
+		// adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl & ~BIT(7));
+		// adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl);
 
 		ret = TALISE_enableDeframerLink(phy->talDevice, priv->link[link_num].source_id, 1);
 		if (ret != TALACT_NO_ACTION) {
@@ -5382,7 +5390,7 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 		if ((framerStatus & 0x07) != 0x05)
 			dev_warn(&phy->spi->dev, "Link%u TAL_FRAMER_A framerStatus 0x%X", link_num, framerStatus);
 
-		jesd204_sysref_async(phy->jdev, 0, NULL);
+		//jesd204_sysref_async(phy->jdev, 0, NULL);
 	} else {
 		ret = TALISE_readDeframerStatus(phy->talDevice, priv->link[link_num].source_id,
 						&deframerStatus);
@@ -5675,9 +5683,10 @@ static int adrv9009_jesd204_setup_stage4(struct jesd204_dev *jdev)
 		return -EFAULT;
 	}
 
+	schedule();
+
 	return JESD204_STATE_CHANGE_DONE;
 }
-
 
 static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev)
 {
