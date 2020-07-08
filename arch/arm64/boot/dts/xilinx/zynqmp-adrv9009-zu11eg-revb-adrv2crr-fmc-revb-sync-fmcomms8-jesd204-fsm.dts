@@ -111,8 +111,8 @@
 	adi,pulse-generator-mode = <HMC7044_PULSE_GEN_16_PULSE>;
 	adi,sync-pin-mode = <1>;
 
-	///delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
-	adi,pll2-autocal-bypass-manual-cap-bank-sel = <13>;
+	/delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
+	//adi,pll2-autocal-bypass-manual-cap-bank-sel = <13>;
 };
 
 &hmc7044_fmc {
@@ -125,8 +125,8 @@
 	adi,pulse-generator-mode = <HMC7044_PULSE_GEN_16_PULSE>;
 	adi,sync-pin-mode = <1>;
 
-	///delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
-	adi,pll2-autocal-bypass-manual-cap-bank-sel = <14>;
+	/delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
+	//adi,pll2-autocal-bypass-manual-cap-bank-sel = <14>;
 };
 
 &hmc7044_fmc_car {
@@ -141,6 +141,6 @@
 	adi,pulse-generator-mode = <HMC7044_PULSE_GEN_16_PULSE>;
 	adi,sync-pin-mode = <0>;
 
-	///delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
-	adi,pll2-autocal-bypass-manual-cap-bank-sel = <13>;
+	/delete-property/ adi,pll2-autocal-bypass-manual-cap-bank-sel;
+	//adi,pll2-autocal-bypass-manual-cap-bank-sel = <13>;
 };
