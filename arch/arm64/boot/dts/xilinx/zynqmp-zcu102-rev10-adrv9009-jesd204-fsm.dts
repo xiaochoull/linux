@@ -19,7 +19,7 @@
 &trx0_adrv9009 {
 	jesd204-device;
 	#jesd204-cells = <2>;
-	jesd204-top-device = <1>; /* This is the TOP device */
+	jesd204-top-device = <0>; /* This is the TOP device */
 	jesd204-link-ids = <DEFRAMER_LINK_TX FRAMER_LINK_RX FRAMER_LINK_ORX>;
 
 	jesd204-inputs =
