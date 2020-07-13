@@ -818,16 +818,16 @@ static int axi_jesd204_rx_jesd204_clks_enable(struct jesd204_dev *jdev,
 
 	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
 
-	ret = clk_prepare_enable(jesd->lane_clk);
+	ret = clk_prepare_enable(jesd->device_clk);
 		if (ret) {
-		dev_err(dev, "%s: Link%u enable lane clock failed (%d)\n",
+		dev_err(dev, "%s: Link%u enable device clock failed (%d)\n",
 			__func__, link_num, ret);
 		return ret;
 	}
 
-	ret = clk_prepare_enable(jesd->device_clk);
+	ret = clk_prepare_enable(jesd->lane_clk);
 		if (ret) {
-		dev_err(dev, "%s: Link%u enable device clock failed (%d)\n",
+		dev_err(dev, "%s: Link%u enable lane clock failed (%d)\n",
 			__func__, link_num, ret);
 		return ret;
 	}
