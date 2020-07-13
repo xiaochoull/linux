@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/of.h>
+#include <linux/slab.h>
 
 #include "jesd204-priv.h"
 
@@ -479,7 +480,7 @@ static int jesd204_fsm_handle_con_cb(struct jesd204_dev *jdev,
 
 	if (ret != JESD204_STATE_CHANGE_DONE)
 		return ret;
-	
+
 	if (con)
 		con->state = fsm_data->nxt_state;
 
@@ -699,7 +700,13 @@ static int __jesd204_fsm(struct jesd204_dev *jdev,
 	if (ret)
 		goto out_clear_busy;
 
-	ret = jesd204_fsm_propagate_cb(jdev, &data);
+	/**
+	 * Always propagate from the top-level device, otherwise if
+	 * if we propagate from a device that is somewhere in a topology
+	 * and belongs to a certain JESD204 link, we may miss certain
+	 * devices when propagating changes for all JESD204 links
+	 */
+	ret = jesd204_fsm_propagate_cb(&jdev_top->jdev, &data);
 	if (ret)
 		goto out_clear_busy;
 
@@ -745,18 +752,17 @@ static int jesd204_fsm(struct jesd204_dev *jdev,
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	int ret;
 
-	if (jdev_top) {
+	if (jdev_top)
 		return __jesd204_fsm(jdev, jdev_top, link_idx,
 				     cur_state, nxt_state, fsm_change_cb,
 				     cb_data, fsm_complete_cb,
 				     handle_busy_flags);
-	}
 
 	list_for_each_entry(jdev_top, jesd204_topologies, entry) {
 		if (!jesd204_dev_has_con_in_topology(jdev, jdev_top))
 			continue;
 
-		ret = __jesd204_fsm(&jdev_top->jdev, jdev_top, link_idx,
+		ret = __jesd204_fsm(jdev, jdev_top, link_idx,
 				    cur_state, nxt_state, fsm_change_cb,
 				    cb_data, fsm_complete_cb,
 				    handle_busy_flags);
