@@ -5,7 +5,6 @@
  *
  * Licensed under the GPL-2.
  */
-
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -1292,6 +1291,8 @@ static int ad9528_jesd204_sysref(struct jesd204_dev *jdev,
 	val |= AD9528_SYSREF_PATTERN_REQ;
 
 	ret = ad9528_write(indio_dev, AD9528_SYSREF_CTRL, val);
+
+	ad9528_io_update(indio_dev);
 
 	mutex_unlock(&st->lock);
 
