@@ -13,7 +13,6 @@
 
 #include "zynqmp-zcu102-rev10-adrv9009.dts"
 
-
 #include <dt-bindings/iio/adc/adi,adrv9009.h>
 
 &trx0_adrv9009 {
@@ -25,9 +24,15 @@
 	jesd204-inputs =
 		<&axi_adrv9009_rx_jesd 0 FRAMER_LINK_RX>,
 		<&axi_adrv9009_rx_os_jesd 0 FRAMER_LINK_ORX>,
-		<&axi_adrv9009_tx_jesd 0 DEFRAMER_LINK_TX>;
+		<&axi_adrv9009_core_tx 0 DEFRAMER_LINK_TX>;
 
 	/delete-property/ interrupts;
+};
+
+&axi_adrv9009_core_tx {
+	jesd204-device;
+	#jesd204-cells = <2>;
+	jesd204-inputs = <&axi_adrv9009_tx_jesd 0 DEFRAMER_LINK_TX>;
 };
 
 &axi_adrv9009_rx_jesd {
