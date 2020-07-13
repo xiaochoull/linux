@@ -275,7 +275,6 @@ static int jesd204_fsm_propagate_cb_top_level(struct jesd204_dev *jdev,
 	 * FIXME: think of a better way to iterate the top-level device callback here.
 	 * for now this works; and is slightly cleaner than before
 	 */
-	jdev = &fsm_data->jdev_top->jdev;
 	for (i = 0; i < fsm_data->jdev_top->num_links; i++) {
 		ret = jesd204_fsm_handle_con_cb(jdev, NULL, i, fsm_data);
 		if (ret)
@@ -448,8 +447,9 @@ static int jesd204_con_validate_cur_state(struct jesd204_dev *jdev,
 	if (fsm_data->cur_state != c->state) {
 		ol = &fsm_data->jdev_top->active_links[c->link_idx];
 		dev_warn(jdev->dev.parent,
-			 "JESD204 link[%d] invalid connection state: %s, exp: %s, nxt: %s\n",
+			 "JESD204 link[%d] invalid con[%u] state: %s, exp: %s, nxt: %s\n",
 			 c->link_idx,
+			 c->id,
 			 jesd204_state_str(c->state),
 			 jesd204_state_str(fsm_data->cur_state),
 			 jesd204_state_str(fsm_data->nxt_state));
@@ -746,7 +746,6 @@ static int jesd204_fsm(struct jesd204_dev *jdev,
 	int ret;
 
 	if (jdev_top) {
-		pr_err("%pOF %s  %d  %s -> %s\n", jdev->np, __func__, __LINE__, jesd204_state_str(cur_state), jesd204_state_str(nxt_state));
 		return __jesd204_fsm(jdev, jdev_top, link_idx,
 				     cur_state, nxt_state, fsm_change_cb,
 				     cb_data, fsm_complete_cb,
@@ -757,8 +756,7 @@ static int jesd204_fsm(struct jesd204_dev *jdev,
 		if (!jesd204_dev_has_con_in_topology(jdev, jdev_top))
 			continue;
 
-		pr_err("%pOF %s  %d  %s -> %s\n", jdev->np, __func__, __LINE__, jesd204_state_str(cur_state), jesd204_state_str(nxt_state));
-		ret = __jesd204_fsm(jdev, jdev_top, link_idx,
+		ret = __jesd204_fsm(&jdev_top->jdev, jdev_top, link_idx,
 				    cur_state, nxt_state, fsm_change_cb,
 				    cb_data, fsm_complete_cb,
 				    handle_busy_flags);
