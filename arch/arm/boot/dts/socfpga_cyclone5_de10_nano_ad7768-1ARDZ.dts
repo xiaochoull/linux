@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Analog Devices AD7768-1
@@ -29,7 +28,7 @@
 		sys_clk: sys_clk {
 			#clock-cells = <0x0>;
 			compatible = "fixed-clock";
-			clock-frequency = <40000000>;
+			clock-frequency = <50000000>;
 			clock-output-names = "sys_clk";
 		};
 
@@ -47,11 +46,45 @@
 			clock-output-names = "spi_clk";
 		};
 
+		hdmi_dma_clk: hdmi_dma_clk {
+			#clock-cells = <0x0>;
+			compatible = "fixed-clock";
+			clock-frequency = <50000000>;
+			clock-output-names = "hdmi_dma_clk";
+		};
+
 		ad7768_1_mclk: clock@0 {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";
 			clock-frequency = <16384000>;
 		};
+
+		pixel_clk_pll: pixel_clk_pll {
+			#clock-cells = <0x0>;
+			compatible = "fixed-clock";
+			clock-frequency = <74250000>;
+			clock-output-names = "pixel_clk_pll";
+		};
+	};
+
+	one-bit-adc-dac@0 {
+		compatible = "adi,one-bit-adc-dac";
+		out-gpios = <&gpio_out 8 GPIO_ACTIVE_HIGH>,
+			    <&gpio_out 7 GPIO_ACTIVE_HIGH>,
+			    <&gpio_out 6 GPIO_ACTIVE_HIGH>,
+			    <&gpio_out 4 GPIO_ACTIVE_HIGH>;
+			    /*<&ad7768_1 0 GPIO_ACTIVE_HIGH>,
+			    <&ad7768_1 1 GPIO_ACTIVE_HIGH>,
+			    <&ad7768_1 2 GPIO_ACTIVE_HIGH>,
+			    <&ad7768_1 3 GPIO_ACTIVE_HIGH>;*/
+		out-gpio-names = "cn0540_blue_led",
+				 "cn0540_red_led",
+				 "cn0540_sw_ff_gpio",
+				 "cn0540_shutdown_gpio";/*
+				 "cn0540_ad7768-1-gpio0",
+				 "cn0540_ad7768-1-gpio1",
+				 "cn0540_FDA_DIS",
+				 "cn0540_FDA_MODE";*/
 	};
 };
 
@@ -61,6 +94,35 @@
 		compatible = "adi,ltc2606";
 		reg = <0x10>;
 		vref-supply = <&vref>;
+	};
+	
+	adv7513: adv7513@0x39 {
+		compatible = "adi,adv7513";
+		reg = <0x39>, <0x3f>;
+		reg-names = "primary", "edid";
+
+		adi,input-depth = <8>;
+		adi,input-colorspace = "rgb";
+		adi,input-clock = "1x";
+		adi,clock-delay = <0>;
+
+		#sound-dai-cells = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				adv7513_in: endpoint {
+					remote-endpoint = <&axi_hdmi_out>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+			};
+		};
 	};
 };
 
@@ -85,7 +147,7 @@
 		#gpio-cells = <2>;
 		gpio-controller;
 
-		cn0540_blue_led{
+		/* cn0540_blue_led{
 			gpios = <8 GPIO_ACTIVE_HIGH>;
 			output-low;
 			line-name = "cn0540_blue_led";
@@ -105,7 +167,7 @@
 			gpios = <4 GPIO_ACTIVE_HIGH>;
 			output-high;
 			line-name = "cn0540_shutdown_gpio";
-		};
+		}; */
 	};
 
 	axi_dmac_0: rx-dma@0x00020000 {
@@ -158,6 +220,43 @@
 			#io-channel-cells = <1>;
 			gpio-controller;
 			#gpio-cells = <1>;
+		};
+	};
+
+	hdmi_tx_dma: dma@0x00080000 {
+		compatible = "adi,axi-dmac-1.00.a";
+		reg = <0x00080000 0x10000>;
+		interrupt-parent = <&intc>;
+		interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
+		#dma-cells = <1>;
+		clocks = <&hdmi_dma_clk>;
+
+		adi,channels {
+			#size-cells = <0>;
+			#address-cells = <1>;
+
+			dma-channel@0 {
+				reg = <0>;
+				adi,source-bus-width = <64>;
+				adi,source-bus-type = <0>;
+				adi,destination-bus-width = <64>;
+				adi,destination-bus-type = <1>;
+			};
+		};
+	};
+
+	axi_hdmi@0x00090000 {
+		compatible = "adi,axi-hdmi-tx-1.00.a";
+		reg = <0x00090000 0x10000>;
+		dmas = <&hdmi_tx_dma 0>;
+		dma-names = "video";
+		clocks = <&pixel_clk_pll>;
+		adi,is-rgb;
+
+		port {
+			axi_hdmi_out: endpoint {
+				remote-endpoint = <&adv7513_in>;
+			};
 		};
 	};
 };

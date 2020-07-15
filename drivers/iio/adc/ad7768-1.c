@@ -336,7 +336,7 @@ static int ad7768_set_dig_fil(struct ad7768_state *st,
 	return 0;
 }
 
-static int ad7768_gpio_get(struct gpio_chip *chip, unsigned offset)
+int ad7768_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	struct ad7768_state *st = gpiochip_get_data(chip);
 	unsigned int val;
@@ -350,10 +350,10 @@ static int ad7768_gpio_get(struct gpio_chip *chip, unsigned offset)
 	}
 
 	if (val & BIT(offset)){
-		ret = -EPREM;
+		ret = -EPERM;
 	} else {
 		val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_READ, 1);
-		if (ret < 0)
+		if (ret < 0) {
 			ret = val;
 			goto gpio_get_err;
 		}
@@ -367,7 +367,7 @@ gpio_get_err:
 	return ret;
 }
 
-static void ad7768_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+void ad7768_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	struct ad7768_state *st = gpiochip_get_data(chip);
 	unsigned int val;
@@ -376,14 +376,12 @@ static void ad7768_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 	mutex_lock(&st->gpio_lock);
 	val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_CONTROL, 1);
 	if (val < 0){
-		ret = val;
 		goto gpio_set_err;
 	}
 
 	if (ret & BIT(offset)){
 		val = ad7768_spi_reg_read(st, AD7768_REG_GPIO_WRITE, 1);
 		if (val < 0){
-			ret = val;
 			goto gpio_set_err;
 		}
 
@@ -395,19 +393,14 @@ static void ad7768_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 						  AD7768_REG_GPIO_WRITE,
 						  AD7768_GPIO_WRITE_MSK,
 						  val);
-		if (ret < 0)
-			goto gpio_set_err;
-	} else {
-		ret = -EPREM;
 	}
 
 gpio_set_err:
 	mutex_unlock(&st->gpio_lock);
 
-	return ret;
 }
 
-static int ad7768_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+int ad7768_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
 {
 	struct ad7768_state *st = gpiochip_get_data(chip);
 	unsigned int val;
@@ -430,9 +423,10 @@ gpio_dir_in_err:
 	mutex_unlock(&st->gpio_lock);
 
 	return ret;
+}
 
-static int ad7768_gpio_direction_output(struct gpio_chip *chip,
-					 unsigned offset, int value)
+int ad7768_gpio_direction_output(struct gpio_chip *chip,
+				 unsigned offset, int value)
 {
 	struct ad7768_state *st = gpiochip_get_data(chip);
 	unsigned int val;
@@ -457,9 +451,9 @@ gpio_dir_out_err:
 	return ret;
 }
 
-static int ad7768_gpio_request(struct gpio_chip *chip, unsigned offset)
+int ad7768_gpio_request(struct gpio_chip *chip, unsigned offset)
 {
-	struct ad5592r_state *st = gpiochip_get_data(chip);
+	struct ad7768_state *st = gpiochip_get_data(chip);
 
 	if (st->gpio_avail_map & BIT(offset))
 		st->gpio_avail_map &= ~BIT(offset);
@@ -468,13 +462,14 @@ static int ad7768_gpio_request(struct gpio_chip *chip, unsigned offset)
 
 	return 0;
 }
-static int ad7768_gpio_init(struct ad7768_state *st)
+
+int ad7768_gpio_init(struct ad7768_state *st)
 {
 	st->gpio_avail_map = AD7768_GPIO_CONTROL_MSK;
-	st->gpiochip.label = dev_name(st->dev);
+	st->gpiochip.label = dev_name(&st->spi->dev);
 	st->gpiochip.base = -1;
 	st->gpiochip.ngpio = 4;
-	st->gpiochip.parent = st->dev;
+	st->gpiochip.parent = &st->spi->dev;
 	st->gpiochip.can_sleep = false;
 	st->gpiochip.direction_input = ad7768_gpio_direction_input;
 	st->gpiochip.direction_output = ad7768_gpio_direction_output;
@@ -487,7 +482,7 @@ static int ad7768_gpio_init(struct ad7768_state *st)
 	return gpiochip_add_data(&st->gpiochip, st);
 }
 
-static int ad7768_set_freq(struct ad7768_state *st,
+int ad7768_set_freq(struct ad7768_state *st,
 			   unsigned int freq)
 {
 	unsigned int diff_new, diff_old, pwr_mode, i, idx;
@@ -538,7 +533,7 @@ static const char * const ad7768_vcm_modes[] = {
 	"OFF",
 };
 
-static int ad7768_get_vcm(struct iio_dev *dev,
+int ad7768_get_vcm(struct iio_dev *dev,
 			  const struct iio_chan_spec *chan)
 {
 	struct ad7768_state *st = iio_priv(dev);
@@ -546,7 +541,7 @@ static int ad7768_get_vcm(struct iio_dev *dev,
 	return st->common_mode_voltage;
 }
 
-static int ad7768_set_vcm(struct iio_dev *dev,
+int ad7768_set_vcm(struct iio_dev *dev,
 			  const struct iio_chan_spec *chan,
 			  unsigned int mode)
 {
@@ -601,7 +596,7 @@ static ssize_t ad7768_sampling_freq_avail(struct device *dev,
 
 static IIO_DEV_ATTR_SAMP_FREQ_AVAIL(ad7768_sampling_freq_avail);
 
-static int ad7768_read_raw(struct iio_dev *indio_dev,
+int ad7768_read_raw(struct iio_dev *indio_dev,
 			   struct iio_chan_spec const *chan,
 			   int *val, int *val2, long info)
 {
@@ -643,7 +638,7 @@ static int ad7768_read_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
-static int ad7768_write_raw(struct iio_dev *indio_dev,
+int ad7768_write_raw(struct iio_dev *indio_dev,
 			    struct iio_chan_spec const *chan,
 			    int val, int val2, long info)
 {
@@ -674,7 +669,7 @@ static const struct iio_info ad7768_info = {
 	.debugfs_reg_access = &ad7768_reg_access,
 };
 
-static int ad7768_setup(struct ad7768_state *st)
+int ad7768_setup(struct ad7768_state *st)
 {
 	int ret;
 
@@ -806,8 +801,6 @@ static int ad7768_buffer_predisable(struct iio_dev *indio_dev)
 		return ad7768_spi_reg_read(st, AD7768_REG_ADC_DATA, 3);
 	}
 }
-
-static int ad7768_gpio_direction_input(struct ad7768_state *st)
 
 static int hw_submit_block(struct iio_dma_buffer_queue *queue,
 			   struct iio_dma_buffer_block *block)
