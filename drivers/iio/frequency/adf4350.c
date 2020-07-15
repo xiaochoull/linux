@@ -364,7 +364,8 @@ static struct adf4350_platform_data *adf4350_parse_dt(struct device *dev)
 	if (!pdata)
 		return NULL;
 
-	snprintf(&pdata->name[0], SPI_NAME_SIZE - 1, "%pOFn", np);
+	/* FIXME: make this more upstreamable */
+	snprintf(&pdata->name[0], SPI_NAME_SIZE - 1, "%pOFn", dev->of_node->name);
 
 	tmp = 10000;
 	of_property_read_u32(np, "adi,channel-spacing", &tmp);
