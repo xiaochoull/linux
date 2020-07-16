@@ -900,13 +900,13 @@
 		adi,pll2-autocal-bypass-manual-cap-bank-sel = <0xf>;
 
 		clock-output-names =
-			"hmc7044_out0_DEV_REFCLK_C", "hmc7044_out1_DEV_SYSREF_C",
-			"hmc7044_out2_DEV_REFCLK_D", "hmc7044_out3_DEV_SYSREF_D",
-			"hmc7044_out4_JESD_REFCLK_TX_OBS_CD", "hmc7044_out5_JESD_REFCLK_RX_CD",
-			"hmc7044_out6_FPGA_SYSREF_TX_OBS_CD","hmc7044_out7_FPGA_SYSREF_RX_CD",
-			"hmc7044_out8_CORE_CLK_TX_OBS_CD", "hmc7044_out9_CORE_CLK_RX_CD",
-			"hmc7044_out10", "hmc7044_out11",
-			"hmc7044_out12", "hmc7044_out13";
+			"hmc7044_fmc_out0_DEV_REFCLK_C", "hmc7044_fmc_out1_DEV_SYSREF_C",
+			"hmc7044_fmc_out2_DEV_REFCLK_D", "hmc7044_fmc_out3_DEV_SYSREF_D",
+			"hmc7044_fmc_out4_JESD_REFCLK_TX_OBS_CD", "hmc7044_fmc_out5_JESD_REFCLK_RX_CD",
+			"hmc7044_fmc_out6_FPGA_SYSREF_TX_OBS_CD","hmc7044_fmc_out7_FPGA_SYSREF_RX_CD",
+			"hmc7044_fmc_out8_CORE_CLK_TX_OBS_CD", "hmc7044_fmc_out9_CORE_CLK_RX_CD",
+			"hmc7044_fmc_out10", "hmc7044_fmc_out11",
+			"hmc7044_fmc_out12", "hmc7044_fmc_out13";
 
 		hmc7044_fmc_c0: channel@0 {
 			reg = <0>;
