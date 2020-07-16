@@ -75,39 +75,48 @@
 	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs = <&axi_adrv9009_adxcvr_rx 0 FRAMER_LINK_RX>;
+	clocks = <&zynqmp_clk 71>, <&hmc7044 7>, <&axi_adrv9009_adxcvr_rx 0>, <&hmc7044_fmc 5>;
+	clock-names = "s_axi_aclk", "device_clk", "lane_clk", "conv2";
 };
 
 &axi_adrv9009_rx_os_jesd {
 	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs = <&axi_adrv9009_adxcvr_rx_os 0 FRAMER_LINK_ORX>;
+	clocks = <&zynqmp_clk 71>, <&hmc7044 6>, <&axi_adrv9009_adxcvr_rx_os 0>, <&hmc7044_fmc 4>;
+	clock-names = "s_axi_aclk", "device_clk", "lane_clk", "conv2";
 };
 
 &axi_adrv9009_tx_jesd {
 	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs = <&axi_adrv9009_adxcvr_tx 0 DEFRAMER_LINK_TX>;
+	clocks = <&zynqmp_clk 71>, <&hmc7044 6>, <&axi_adrv9009_adxcvr_tx 0>, <&hmc7044_fmc 4>;
+	clock-names = "s_axi_aclk", "device_clk", "lane_clk", "conv2";
 };
 
 &axi_adrv9009_adxcvr_rx {
     	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs =  <&hmc7044 0 FRAMER_LINK_RX>;
-	clocks = <&hmc7044_fmc 5>;
+	clock-names = "conv", "conv2";
+	clocks = <&hmc7044 5>, <&hmc7044_fmc 5>;
 };
 
 &axi_adrv9009_adxcvr_rx_os {
     	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs =  <&hmc7044 0 FRAMER_LINK_ORX>;
-	clocks = <&hmc7044_fmc 4>;
+	clock-names = "conv", "conv2";
+	clocks = <&hmc7044 4>, <&hmc7044_fmc 4>;
 };
 
 &axi_adrv9009_adxcvr_tx {
     	jesd204-device;
 	#jesd204-cells = <2>;
 	jesd204-inputs =  <&hmc7044 0 DEFRAMER_LINK_TX>;
-	clocks = <&hmc7044_fmc 4>;
+	clock-names = "conv", "conv2";
+	clocks = <&hmc7044 4>, <&hmc7044_fmc 4>;
 };
 
 &hmc7044 {
