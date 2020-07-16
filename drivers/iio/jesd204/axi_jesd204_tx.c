@@ -84,6 +84,7 @@ struct axi_jesd204_tx {
 
 	struct clk *axi_clk;
 	struct clk *device_clk;
+	struct clk *conv2_clk;
 
 	struct jesd204_dev *jdev;
 
@@ -593,6 +594,15 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 
 	rate = clk_get_rate(jesd->lane_clk);
 
+	ret = clk_set_rate(jesd->device_clk, link_rate);
+	if (ret) {
+		dev_err(dev, "%s: Link%u set device clock rate %lu Hz failed (%d)\n",
+			__func__, link_num, link_rate, ret);
+		return ret;
+	}
+
+	rate = clk_get_rate(jesd->lane_clk);
+
 	if (rate != lane_rate) {
 		rate = clk_round_rate(jesd->lane_clk, lane_rate);
 		if (rate != (long)lane_rate) {
@@ -607,11 +617,13 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 
 			if (rate != (long)link_rate) {
 				rate = clk_round_rate(parent, link_rate);
-				if (rate == (long)link_rate)
+				if (rate == (long)link_rate) {
 					ret = clk_set_rate(parent, link_rate);
-				else
+					if (!ret && !IS_ERR(jesd->conv2_clk))
+						ret = clk_set_rate(jesd->conv2_clk, link_rate);
+				} else {
 					ret = -EINVAL;
-
+				}
 				if (ret < 0) {
 					dev_err(dev, "%s: Link%u set REFCLK to device/link rate %lu Hz failed (%d)\n",
 						__func__, link_num, link_rate, ret);
@@ -624,13 +636,6 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 				__func__, link_num, lane_rate, ret);
 			return ret;
 		}
-	}
-
-	ret = clk_set_rate(jesd->device_clk, link_rate);
-	if (ret) {
-		dev_err(dev, "%s: Link%u set device clock rate %lu Hz failed (%d)\n",
-			__func__, link_num, link_rate, ret);
-		return ret;
 	}
 
 	ret = clk_prepare_enable(jesd->device_clk);
@@ -786,6 +791,18 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 	jesd->lane_clk = devm_clk_get(&pdev->dev, "lane_clk");
 	if (IS_ERR(jesd->lane_clk))
 		return PTR_ERR(jesd->lane_clk);
+
+	/*
+	 * Optional CPLL/QPLL REFCLK from a difference source
+	 * which rate and state must be in sync with the main conv clk
+	 * This is used in axi_jesd204_rx_jesd204_link_setup() where the
+	 * main REFCLK is the parent of jesd->lane_clk.
+	 */
+	jesd->conv2_clk = devm_clk_get(&pdev->dev, "conv2");
+	if (IS_ERR(jesd->conv2_clk)) {
+		if (PTR_ERR(jesd->conv2_clk) != -ENOENT)
+			return PTR_ERR(jesd->conv2_clk);
+	}
 
 	ret = clk_prepare_enable(jesd->axi_clk);
 	if (ret)

@@ -554,6 +554,8 @@ static void adxcvr_enforce_settings(struct adxcvr_state *st)
 	 */
 
 	parent_rate = clk_get_rate(st->conv_clk);
+	if (!IS_ERR(st->conv2_clk))
+		clk_set_rate(st->conv2_clk, parent_rate);
 
 	lane_rate = adxcvr_clk_recalc_rate(&st->lane_clk_hw, parent_rate);
 
@@ -608,6 +610,16 @@ static int adxcvr_probe(struct platform_device *pdev)
 	if (IS_ERR(st->conv_clk))
 		return PTR_ERR(st->conv_clk);
 
+	/*
+	 * Otional CPLL/QPLL REFCLK from a difference source
+	 * which rate and state must be in sync with the conv clk
+	 */
+	st->conv2_clk = devm_clk_get(&pdev->dev, "conv2");
+	if (IS_ERR(st->conv2_clk)) {
+		if (PTR_ERR(st->conv2_clk) != -ENOENT)
+			return PTR_ERR(st->conv2_clk);
+	}
+
 	st->lane_rate_div40_clk = devm_clk_get(&pdev->dev, "div40");
 	if (IS_ERR(st->lane_rate_div40_clk)) {
 		if (PTR_ERR(st->lane_rate_div40_clk) != -ENOENT)
@@ -628,6 +640,12 @@ static int adxcvr_probe(struct platform_device *pdev)
 	ret = clk_prepare_enable(st->conv_clk);
 	if (ret < 0)
 		return ret;
+
+	if (!IS_ERR(st->conv2_clk)) {
+		ret = clk_prepare_enable(st->conv2_clk);
+		if (ret < 0)
+			return ret;
+	}
 
 	st->xcvr.dev = &pdev->dev;
 	st->xcvr.drp_ops = &adxcvr_drp_ops;
@@ -735,6 +753,8 @@ static int adxcvr_probe(struct platform_device *pdev)
 
 disable_unprepare:
 	clk_disable_unprepare(st->conv_clk);
+	if (!IS_ERR(st->conv2_clk))
+		clk_disable_unprepare(st->conv2_clk);
 
 	return ret;
 }
@@ -755,6 +775,8 @@ static int adxcvr_remove(struct platform_device *pdev)
 	adxcvr_eyescan_unregister(st);
 	of_clk_del_provider(pdev->dev.of_node);
 	clk_disable_unprepare(st->conv_clk);
+	if (!IS_ERR(st->conv2_clk))
+		clk_disable_unprepare(st->conv2_clk);
 
 	if (st->clks[1])
 		clk_unregister_fixed_factor(st->clks[1]);
