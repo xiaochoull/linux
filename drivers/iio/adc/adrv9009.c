@@ -5880,6 +5880,130 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 	.sizeof_priv = sizeof(struct adrv9009_jesd204_priv),
 };
 
+static const struct jesd204_dev_data jesd204_adrv90081_init = {
+	.state_ops = {
+		[JESD204_OP_LINK_INIT] = {
+			.per_link = adrv9009_jesd204_link_init,
+		},
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = adrv9009_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = adrv9009_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_SETUP] = {
+			.per_device = adrv9009_jesd204_link_setup,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_LINK_DISABLE] = {
+			.per_link = adrv9009_jesd204_link_disable,
+		},
+		[JESD204_OP_LINK_ENABLE] = {
+			.per_link = adrv9009_jesd204_link_enable,
+		},
+		[JESD204_OP_LINK_SYSREF] = {
+			.per_device = adrv9009_jesd204_noop,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_LINK_RUNNING] = {
+			.per_link = adrv9009_jesd204_link_running,
+		},
+		[JESD204_OP_LINK_DOWN] = {
+			.per_device = adrv9009_jesd204_uninit,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE1] = {
+			.per_device = adrv9009_jesd204_setup_stage1,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE2] = {
+			.per_device = adrv9009_jesd204_setup_stage2,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE3] = {
+			.per_device = adrv9009_jesd204_setup_stage3,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE4] = {
+			.per_device = adrv9009_jesd204_setup_stage4,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE5] = {
+			.per_device = adrv9009_jesd204_setup_stage5,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_POST_RUNNING_STAGE] = {
+			.per_device = adrv9009_jesd204_post_running_stage,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+	},
+
+	.num_links = 1,
+	.sizeof_priv = sizeof(struct adrv9009_jesd204_priv),
+};
+
+static const struct jesd204_dev_data jesd204_adrv90082_init = {
+	.state_ops = {
+		[JESD204_OP_LINK_INIT] = {
+			.per_link = adrv9009_jesd204_link_init,
+		},
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = adrv9009_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = adrv9009_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_SETUP] = {
+			.per_device = adrv9009_jesd204_link_setup,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_LINK_DISABLE] = {
+			.per_link = adrv9009_jesd204_link_disable,
+		},
+		[JESD204_OP_LINK_ENABLE] = {
+			.per_link = adrv9009_jesd204_link_enable,
+		},
+		[JESD204_OP_LINK_SYSREF] = {
+			.per_device = adrv9009_jesd204_noop,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_LINK_RUNNING] = {
+			.per_link = adrv9009_jesd204_link_running,
+		},
+		[JESD204_OP_LINK_DOWN] = {
+			.per_device = adrv9009_jesd204_uninit,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE1] = {
+			.per_device = adrv9009_jesd204_setup_stage1,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE2] = {
+			.per_device = adrv9009_jesd204_setup_stage2,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE3] = {
+			.per_device = adrv9009_jesd204_setup_stage3,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE4] = {
+			.per_device = adrv9009_jesd204_setup_stage4,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE5] = {
+			.per_device = adrv9009_jesd204_setup_stage5,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+		[JESD204_OP_OPT_POST_RUNNING_STAGE] = {
+			.per_device = adrv9009_jesd204_post_running_stage,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
+		},
+	},
+
+	.num_links = 2,
+	.sizeof_priv = sizeof(struct adrv9009_jesd204_priv),
+};
+
 static int adrv9009_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
@@ -5898,12 +6022,12 @@ static int adrv9009_probe(struct spi_device *spi)
 	case ID_ADRV9009_X4:
 		jesd204_init = &jesd204_adrv9009_init;
 		break;
-	// case ID_ADRV90081:
-	// 	jesd204_init = &jesd204_adrv90081_init;
-	// 	break;
-	// case ID_ADRV90082:
-	// 	jesd204_init = &jesd204_adrv90082_init;
-	// 	break;
+	case ID_ADRV90081:
+		jesd204_init = &jesd204_adrv90081_init;
+		break;
+	case ID_ADRV90082:
+		jesd204_init = &jesd204_adrv90082_init;
+		break;
 	default:
 		return -EINVAL;
 	}
