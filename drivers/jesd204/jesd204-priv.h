@@ -121,6 +121,7 @@ struct jesd204_dev {
 
 	bool				fsm_inited;
 	bool				is_top;
+	bool				is_sysref_provider;
 
 	int				error;
 	const struct jesd204_state_op	*state_ops;

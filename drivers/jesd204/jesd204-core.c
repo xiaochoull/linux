@@ -199,6 +199,38 @@ int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
 }
 EXPORT_SYMBOL_GPL(jesd204_link_get_lmfc_lemc_rate);
 
+static struct jesd204_dev *jesd204_dev_sysref_provider(struct jesd204_dev *tp_jdev)
+{
+	struct jesd204_dev *jdev;
+
+	list_for_each_entry(jdev, &jesd204_device_list, entry) {
+		/* FIXME: Needs to match by by topology */
+		if (jdev->is_sysref_provider)
+			return jdev;
+	}
+
+	return NULL;
+}
+
+int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
+	unsigned int link_num,
+	struct jesd204_link *lnk)
+{
+	jesd204_link_cb link_op;
+	struct jesd204_dev *jdev = jesd204_dev_sysref_provider(tp_jdev);
+
+	if (!jdev)
+		return -ENODEV;
+
+	link_op = jdev->state_ops[JESD204_OP_SYSREF].per_link;
+
+	if (link_op)
+		return link_op(jdev, lnk);
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(jesd204_sysref_async);
+
 bool jesd204_dev_is_top(struct jesd204_dev *jdev)
 {
 	return jdev && jdev->is_top;
@@ -367,6 +399,8 @@ static struct jesd204_dev *jesd204_dev_alloc(struct device_node *np)
 			goto err_free_id;
 		}
 	}
+
+	jdev->is_sysref_provider = of_property_read_bool(np, "jesd204-sysref-provider");
 
 	jdev->id = id;
 	jdev->np = of_node_get(np);
