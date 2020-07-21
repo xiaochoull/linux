@@ -54,6 +54,7 @@ struct adxcvr_state {
 	void __iomem		*regs;
 	struct jesd204_dev	*jdev;
 	struct clk		*conv_clk;
+	struct clk		*conv2_clk;
 	struct clk		*lane_rate_div40_clk;
 	struct clk_hw		lane_clk_hw;
 	struct work_struct	work;
