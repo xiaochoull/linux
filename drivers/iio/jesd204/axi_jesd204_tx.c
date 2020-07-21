@@ -21,6 +21,9 @@
 #include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/fpga/adi-axi-common.h>
+
+#include <linux/jesd204/jesd204.h>
+
 #include "axi_jesd204.h"
 
 #define JESD204_TX_REG_MAGIC			0x0c
@@ -83,6 +86,8 @@ struct axi_jesd204_tx {
 	struct clk *axi_clk;
 	struct clk *device_clk;
 	struct clk *conv2_clk;
+
+	struct jesd204_dev *jdev;
 
 	int irq;
 
@@ -318,8 +323,9 @@ static int axi_jesd204_tx_apply_config(struct axi_jesd204_tx *jesd,
 			axi_jesd204_tx_set_lane_ilas(jesd, config, lane);
 	}
 
-	writel_relaxed(config->sysref_lmfc_offset,
-		jesd->base + JESD204_TX_REG_SYSREF_LMFC_OFFSET);
+	if (config->sysref_lmfc_offset)
+		writel_relaxed(config->sysref_lmfc_offset,
+			jesd->base + JESD204_TX_REG_SYSREF_LMFC_OFFSET);
 
 	return 0;
 }
@@ -521,10 +527,204 @@ static int axi_jesd204_tx_pcore_check(struct axi_jesd204_tx *jesd)
 	return 0;
 }
 
+static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+	struct jesd204_tx_config config;
+	unsigned long link_rate, lane_rate;
+	long rate;
+	int ret;
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+
+	config.device_id = lnk->did;
+	config.bank_id = lnk->bid;
+	config.lanes_per_device = jesd->num_lanes;
+	//config.lanes_per_device = lnk->num_lanes;
+	config.octets_per_frame = lnk->octets_per_frame;
+	config.frames_per_multiframe = lnk->frames_per_multiframe;
+	config.converters_per_device = lnk->num_converters;
+	config.resolution = lnk->converter_resolution;
+	config.bits_per_sample = lnk->bits_per_sample;
+	config.control_bits_per_sample = lnk->ctrl_bits_per_sample;
+	config.samples_per_frame = lnk->samples_per_conv_frame;
+	config.jesd_version = lnk->jesd_version;
+	config.subclass_version = lnk->subclass;
+	config.sysref_lmfc_offset = 0;
+	config.enable_scrambling = lnk->scrambling;
+	config.high_density = lnk->high_density;
+
+	ret = axi_jesd204_tx_apply_config(jesd, &config);
+	if (ret) {
+		dev_err(dev, "%s: Apply config Link%u failed (%d)\n",
+			__func__, lnk->link_id, ret);
+		return ret;
+	}
+
+	ret = jesd204_link_get_device_clock(lnk, &link_rate);
+	dev_dbg(dev, "%s: Link%u device clock rate %lu (%d)\n",
+		__func__, lnk->link_id, link_rate, ret);
+	if (ret) {
+		dev_err(dev, "%s: Link%u get device clock rate failed (%d)\n",
+			__func__, lnk->link_id, ret);
+		return ret;
+	}
+
+	ret = jesd204_link_get_rate_khz(lnk, &lane_rate);
+	dev_dbg(dev, "%s: Link%u lane rate %lu (%d)\n",
+		__func__, lnk->link_id, lane_rate, ret);
+	if (ret) {
+		dev_err(dev, "%s: Link%u get rate failed (%d)\n",
+			__func__, lnk->link_id, ret);
+		return ret;
+	}
+
+	rate = clk_get_rate(jesd->lane_clk);
+
+	ret = clk_set_rate(jesd->device_clk, link_rate);
+	if (ret) {
+		dev_err(dev, "%s: Link%u set device clock rate %lu Hz failed (%d)\n",
+			__func__, lnk->link_id, link_rate, ret);
+		return ret;
+	}
+
+	rate = clk_get_rate(jesd->lane_clk);
+
+	if (rate != lane_rate) {
+		rate = clk_round_rate(jesd->lane_clk, lane_rate);
+		if (rate != (long)lane_rate) {
+			struct clk *parent;
+
+			/*
+			 * Check GT QPLL/CPLL reference clock and make
+			 * it equal to the link/device rate
+			 */
+			parent = clk_get_parent(jesd->lane_clk);
+			rate = clk_get_rate(parent);
+
+			if (rate != (long)link_rate) {
+				rate = clk_round_rate(parent, link_rate);
+				if (rate == (long)link_rate) {
+					ret = clk_set_rate(parent, link_rate);
+					if (!ret && !IS_ERR(jesd->conv2_clk))
+						ret = clk_set_rate(jesd->conv2_clk, link_rate);
+				} else {
+					ret = -EINVAL;
+				}
+				if (ret < 0) {
+					dev_err(dev, "%s: Link%u set REFCLK to device/link rate %lu Hz failed (%d)\n",
+						__func__, lnk->link_id, link_rate, ret);
+				}
+			}
+		}
+		ret = clk_set_rate(jesd->lane_clk, lane_rate);
+		if (ret) {
+			dev_err(dev, "%s: Link%u set lane rate %lu kHz failed (%d)\n",
+				__func__, lnk->link_id, lane_rate, ret);
+			return ret;
+		}
+	}
+
+	ret = clk_prepare_enable(jesd->device_clk);
+		if (ret) {
+		dev_err(dev, "%s: Link%u enable device clock failed (%d)\n",
+			__func__, lnk->link_id, ret);
+		return ret;
+	}
+
+	ret = clk_prepare_enable(jesd->lane_clk);
+		if (ret) {
+		dev_err(dev, "%s: Link%u enable lane clock failed (%d)\n",
+			__func__, lnk->link_id, ret);
+		return ret;
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+
+	writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
+	writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+static int axi_jesd204_tx_jesd204_clks_disable(struct jesd204_dev *jdev,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+
+	clk_disable_unprepare(jesd->lane_clk);
+	clk_disable_unprepare(jesd->device_clk);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_link_disable(struct jesd204_dev *jdev,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+
+	writel_relaxed(0x1, jesd->base + JESD204_TX_REG_LINK_DISABLE);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	//struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+
+	/* This is done in the previous state */
+
+	// writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
+	// writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static const struct jesd204_dev_data jesd204_axi_jesd204_tx_init = {
+	.state_ops = {
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_SETUP] = {
+			.per_link = axi_jesd204_tx_jesd204_link_setup,
+		},
+		[JESD204_OP_LINK_DISABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_link_disable,
+		},
+		[JESD204_OP_LINK_ENABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_link_enable,
+		},
+	},
+};
+
 static int axi_jesd204_tx_probe(struct platform_device *pdev)
 {
 	struct jesd204_tx_config config;
 	struct axi_jesd204_tx *jesd;
+	struct jesd204_dev *jdev;
 	struct resource *res;
 	int irq;
 	int ret;
@@ -532,6 +732,11 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 
 	if (!pdev->dev.of_node)
 		return -ENODEV;
+
+	jdev = devm_jesd204_dev_register(&pdev->dev,
+					 &jesd204_axi_jesd204_tx_init);
+	if (IS_ERR(jdev))
+		return PTR_ERR(jdev);
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -544,6 +749,7 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	jesd->dev = &pdev->dev;
+	jesd->jdev = jdev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	jesd->base = devm_ioremap_resource(&pdev->dev, res);
@@ -633,6 +839,10 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_encoder);
 
 	platform_set_drvdata(pdev, jesd);
+
+	ret = jesd204_fsm_start(jesd->jdev, JESD204_LINKS_ALL);
+	if (ret)
+		goto err_disable_device_clk;
 
 	return 0;
 err_disable_device_clk:
