@@ -1510,7 +1510,10 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 	int ret;
 	u32 val;
 
-	dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, lnk->link_id);
+	if (lnk)
+		dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, lnk->link_id);
+	else
+		dev_dbg(dev, "%s:%d local\n", __func__, __LINE__);
 
 	mutex_lock(&hmc->lock);
 
