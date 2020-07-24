@@ -1153,7 +1153,7 @@ static int adrv9009_multi_chip_sync(struct adrv9009_rf_phy *phy, int step)
 	dev_dbg(&phy->spi->dev, "%s:%d\n",__func__, step);
 
 	if (phy->jdev)
-		return 0;
+		return -ENOTSUPP;
 
 	switch (step) {
 	case 0:
