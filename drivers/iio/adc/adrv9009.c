@@ -5162,6 +5162,7 @@ struct adrv9009_jesd204_priv {
 };
 
 static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -5173,7 +5174,14 @@ static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	switch (reason) {
+	case JESD204_STATE_OP_REASON_INIT:
+		break;
+	default:
+		return JESD204_STATE_CHANGE_DONE;
+	}
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	priv->phy = phy;
 
@@ -5252,6 +5260,7 @@ static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 }
 
 static int adrv9009_jesd204_clks_enable(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -5259,7 +5268,10 @@ static int adrv9009_jesd204_clks_enable(struct jesd204_dev *jdev,
 	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
@@ -5299,27 +5311,8 @@ static int adrv9009_jesd204_clks_enable(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_clks_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
-static int adrv9009_jesd204_link_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -5327,7 +5320,10 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
@@ -5372,6 +5368,7 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 }
 
 static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -5381,7 +5378,10 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 	uint16_t deframerStatus = 0;
 	uint8_t framerStatus = 0;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
@@ -5412,21 +5412,25 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-
-int adrv9009_jesd204_uninit(struct jesd204_dev *jdev)
+int adrv9009_jesd204_uninit(struct jesd204_dev *jdev,
+			    enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
 	struct adrv9009_rf_phy *phy = priv->phy;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_UNINIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	adrv9009_shutdown(phy);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev)
+int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
+				enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
@@ -5436,7 +5440,10 @@ int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev)
 	int ret = TALACT_NO_ACTION;
 	long dev_clk;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	/**********************************************************/
 	/**********************************************************/
@@ -5520,7 +5527,8 @@ int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
+					 enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
@@ -5528,7 +5536,10 @@ static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev)
 	int ret;
 	u8 mcsStatus;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	ret = TALISE_enableMultichipSync(phy->talDevice, 0, &mcsStatus);
 	if (ret != TALACT_NO_ACTION)
@@ -5543,7 +5554,8 @@ static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage2(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_setup_stage2(struct jesd204_dev *jdev,
+					 enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
@@ -5552,7 +5564,10 @@ static int adrv9009_jesd204_setup_stage2(struct jesd204_dev *jdev)
 	u8 pllLockStatus_mask, pllLockStatus = 0;
 	int ret;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	/*******************/
 	/**** Verify MCS ***/
@@ -5647,14 +5662,18 @@ static int adrv9009_jesd204_setup_stage2(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage3(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_setup_stage3(struct jesd204_dev *jdev,
+					 enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
 	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	ret = TALISE_enableMultichipRfLOPhaseSync(phy->talDevice, 0);
 
@@ -5666,14 +5685,19 @@ static int adrv9009_jesd204_setup_stage3(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage4(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_setup_stage4(struct jesd204_dev *jdev,
+					 enum jesd204_state_op_reason reason)
+
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
 	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	/* Parallelization stage ... */
 
@@ -5694,7 +5718,8 @@ static int adrv9009_jesd204_setup_stage4(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev,
+					 enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
@@ -5702,7 +5727,10 @@ static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev)
 	int ret;
 	u8 errorFlag;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	ret = TALISE_waitInitCals(phy->talDevice, 20000, &errorFlag);
 	if (ret != TALACT_NO_ACTION) {
@@ -5737,13 +5765,21 @@ static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_post_running_stage(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_post_running_stage(struct jesd204_dev *jdev,
+					       enum jesd204_state_op_reason reason)
 {
+	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
 	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	u32 trackingCalMask = phy->tracking_cal_mask =  TAL_TRACK_NONE;
+
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
+
 	/***********************************************
 	 * Allow Rx1/2 QEC tracking and Tx1/2 QEC       *
 	 * tracking to run when in the radioOn state    *
@@ -5819,42 +5855,34 @@ static int adrv9009_jesd204_post_running_stage(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_noop(struct jesd204_dev *jdev)
+static int adrv9009_jesd204_noop(struct jesd204_dev *jdev,
+				 enum jesd204_state_op_reason reason)
 {
 	return JESD204_STATE_CHANGE_DONE;
 }
 
 static const struct jesd204_dev_data jesd204_adrv9009_init = {
 	.state_ops = {
+		[JESD204_OP_DEVICE_INIT] = {
+			.per_device = adrv9009_jesd204_uninit,
+		},
 		[JESD204_OP_LINK_INIT] = {
 			.per_link = adrv9009_jesd204_link_init,
 		},
 		[JESD204_OP_CLOCKS_ENABLE] = {
 			.per_link = adrv9009_jesd204_clks_enable,
 		},
-		[JESD204_OP_CLOCKS_DISABLE] = {
-			.per_link = adrv9009_jesd204_clks_disable,
-		},
 		[JESD204_OP_LINK_SETUP] = {
 			.per_device = adrv9009_jesd204_link_setup,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
-		},
-		[JESD204_OP_LINK_DISABLE] = {
-			.per_link = adrv9009_jesd204_link_disable,
 		},
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = adrv9009_jesd204_link_enable,
 		},
 		[JESD204_OP_LINK_SYSREF] = {
 			.per_device = adrv9009_jesd204_noop,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
 		},
 		[JESD204_OP_LINK_RUNNING] = {
 			.per_link = adrv9009_jesd204_link_running,
-		},
-		[JESD204_OP_LINK_DOWN] = {
-			.per_device = adrv9009_jesd204_uninit,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE1] = {
 			.per_device = adrv9009_jesd204_setup_stage1,
@@ -5888,21 +5916,18 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 
 static const struct jesd204_dev_data jesd204_adrv90081_init = {
 	.state_ops = {
+		[JESD204_OP_DEVICE_INIT] = {
+			.per_device = adrv9009_jesd204_uninit,
+		},
 		[JESD204_OP_LINK_INIT] = {
 			.per_link = adrv9009_jesd204_link_init,
 		},
 		[JESD204_OP_CLOCKS_ENABLE] = {
 			.per_link = adrv9009_jesd204_clks_enable,
 		},
-		[JESD204_OP_CLOCKS_DISABLE] = {
-			.per_link = adrv9009_jesd204_clks_disable,
-		},
 		[JESD204_OP_LINK_SETUP] = {
 			.per_device = adrv9009_jesd204_link_setup,
 			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
-		},
-		[JESD204_OP_LINK_DISABLE] = {
-			.per_link = adrv9009_jesd204_link_disable,
 		},
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = adrv9009_jesd204_link_enable,
@@ -5913,10 +5938,6 @@ static const struct jesd204_dev_data jesd204_adrv90081_init = {
 		},
 		[JESD204_OP_LINK_RUNNING] = {
 			.per_link = adrv9009_jesd204_link_running,
-		},
-		[JESD204_OP_LINK_DOWN] = {
-			.per_device = adrv9009_jesd204_uninit,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE1] = {
 			.per_device = adrv9009_jesd204_setup_stage1,
@@ -5950,21 +5971,18 @@ static const struct jesd204_dev_data jesd204_adrv90081_init = {
 
 static const struct jesd204_dev_data jesd204_adrv90082_init = {
 	.state_ops = {
+		[JESD204_OP_DEVICE_INIT] = {
+			.per_device = adrv9009_jesd204_uninit,
+		},
 		[JESD204_OP_LINK_INIT] = {
 			.per_link = adrv9009_jesd204_link_init,
 		},
 		[JESD204_OP_CLOCKS_ENABLE] = {
 			.per_link = adrv9009_jesd204_clks_enable,
 		},
-		[JESD204_OP_CLOCKS_DISABLE] = {
-			.per_link = adrv9009_jesd204_clks_disable,
-		},
 		[JESD204_OP_LINK_SETUP] = {
 			.per_device = adrv9009_jesd204_link_setup,
 			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
-		},
-		[JESD204_OP_LINK_DISABLE] = {
-			.per_link = adrv9009_jesd204_link_disable,
 		},
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = adrv9009_jesd204_link_enable,
@@ -5975,10 +5993,6 @@ static const struct jesd204_dev_data jesd204_adrv90082_init = {
 		},
 		[JESD204_OP_LINK_RUNNING] = {
 			.per_link = adrv9009_jesd204_link_running,
-		},
-		[JESD204_OP_LINK_DOWN] = {
-			.per_device = adrv9009_jesd204_uninit,
-			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE1] = {
 			.per_device = adrv9009_jesd204_setup_stage1,

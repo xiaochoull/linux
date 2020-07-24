@@ -528,6 +528,7 @@ static int axi_jesd204_tx_pcore_check(struct axi_jesd204_tx *jesd)
 }
 
 static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -536,8 +537,6 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	unsigned long link_rate, lane_rate;
 	long rate;
 	int ret;
-
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
 
 	config.device_id = lnk->did;
 	config.bank_id = lnk->bid;
@@ -580,8 +579,6 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 			__func__, lnk->link_id, ret);
 		return ret;
 	}
-
-	rate = clk_get_rate(jesd->lane_clk);
 
 	ret = clk_set_rate(jesd->device_clk, link_rate);
 	if (ret) {
@@ -644,29 +641,38 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
-
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
-
-	writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
-	writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
 static int axi_jesd204_tx_jesd204_clks_disable(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
-
 	clk_disable_unprepare(jesd->lane_clk);
 	clk_disable_unprepare(jesd->device_clk);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
+
+	switch (reason) {
+	case JESD204_STATE_OP_REASON_INIT:
+		break;
+	case JESD204_STATE_OP_REASON_UNINIT:
+		return axi_jesd204_tx_jesd204_clks_disable(jdev, lnk);
+	default:
+		return JESD204_STATE_CHANGE_DONE;
+	}
+
+	writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
+	writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
@@ -677,20 +683,28 @@ static int axi_jesd204_tx_jesd204_link_disable(struct jesd204_dev *jdev,
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
-
 	writel_relaxed(0x1, jesd->base + JESD204_TX_REG_LINK_DISABLE);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	//struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, lnk->link_id);
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
+
+	switch (reason) {
+	case JESD204_STATE_OP_REASON_INIT:
+		break;
+	case JESD204_STATE_OP_REASON_UNINIT:
+		return axi_jesd204_tx_jesd204_link_disable(jdev, lnk);
+	default:
+		return JESD204_STATE_CHANGE_DONE;
+	}
 
 	/* This is done in the previous state */
 
@@ -705,14 +719,8 @@ static const struct jesd204_dev_data jesd204_axi_jesd204_tx_init = {
 		[JESD204_OP_CLOCKS_ENABLE] = {
 			.per_link = axi_jesd204_tx_jesd204_clks_enable,
 		},
-		[JESD204_OP_CLOCKS_DISABLE] = {
-			.per_link = axi_jesd204_tx_jesd204_clks_disable,
-		},
 		[JESD204_OP_LINK_SETUP] = {
 			.per_link = axi_jesd204_tx_jesd204_link_setup,
-		},
-		[JESD204_OP_LINK_DISABLE] = {
-			.per_link = axi_jesd204_tx_jesd204_link_disable,
 		},
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = axi_jesd204_tx_jesd204_link_enable,

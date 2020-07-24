@@ -1650,6 +1650,7 @@ static struct iio_chan_spec_ext_info axidds_ext_info[] = {
 };
 
 static int cf_axi_dds_jesd204_link_supported(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1658,10 +1659,12 @@ static int cf_axi_dds_jesd204_link_supported(struct jesd204_dev *jdev,
 	u32 i, d1, d2, num, multi_device_link;
 	bool failed, last;
 
-	num = ADI_TO_PROFILE_NUM(dds_read(st, ADI_REG_TPL_STATUS));
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
 
-	dev_dbg(dev, "%s:%d link_num%u supported profile %u\n",
-		__func__, __LINE__, lnk->link_id, num);
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
+
+	num = ADI_TO_PROFILE_NUM(dds_read(st, ADI_REG_TPL_STATUS));
 
 	for (i = 0; i < num; i++) {
 		last = (i == (num - 1));
