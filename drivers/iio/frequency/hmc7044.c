@@ -1477,6 +1477,7 @@ static int hmc7044_status_show(struct seq_file *file, void *offset)
 }
 
 static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1485,7 +1486,10 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 	int ret;
 	unsigned long rate;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	ret = jesd204_link_get_lmfc_lemc_rate(lnk, &rate);
 	if (ret < 0)
@@ -1507,6 +1511,7 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 }
 
 static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1515,10 +1520,13 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 	int ret;
 	u32 val;
 
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	if (lnk)
-		dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, lnk->link_id);
+		dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 	else
-		dev_dbg(dev, "%s:%d local\n", __func__, __LINE__);
+		dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	mutex_lock(&hmc->lock);
 
@@ -1538,7 +1546,8 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 	return ret < 0 ? ret : JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
+static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev,
+				      enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
@@ -1546,7 +1555,10 @@ static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 	int ret;
 	unsigned mask, val;
 
-	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	if (hmc->is_sysref_provider) {
 		if (hmc->device_id == HMC7044)
@@ -1576,14 +1588,21 @@ static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_clks_sync2(struct jesd204_dev *jdev)
+static int hmc7044_jesd204_clks_sync2(struct jesd204_dev *jdev,
+				      enum jesd204_state_op_reason reason)
+
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
 
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
+
 	if (hmc->is_sysref_provider) {
-		int ret =  hmc7044_jesd204_sysref(jdev, NULL);
+		int ret =  hmc7044_jesd204_sysref(jdev, reason, NULL);
 		msleep(2);
 		return ret;
 	}
@@ -1591,13 +1610,19 @@ static int hmc7044_jesd204_clks_sync2(struct jesd204_dev *jdev)
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_clks_sync3(struct jesd204_dev *jdev)
+static int hmc7044_jesd204_clks_sync3(struct jesd204_dev *jdev,
+				      enum jesd204_state_op_reason reason)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
 	unsigned val;
 	int ret;
+
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
 
 	if (hmc->is_sysref_provider)
 		return JESD204_STATE_CHANGE_DONE;
@@ -1618,6 +1643,7 @@ static int hmc7044_jesd204_clks_sync3(struct jesd204_dev *jdev)
 }
 
 static int hmc7044_jesd204_link_pre_setup(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);

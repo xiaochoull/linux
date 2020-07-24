@@ -1236,6 +1236,7 @@ pll2_bypassed:
 }
 
 static int ad9528_jesd204_link_supported(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1244,7 +1245,10 @@ static int ad9528_jesd204_link_supported(struct jesd204_dev *jdev,
 	int ret;
 	unsigned long rate;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	ret = jesd204_link_get_lmfc_lemc_rate(lnk, &rate);
 	if (ret < 0)
@@ -1266,6 +1270,7 @@ static int ad9528_jesd204_link_supported(struct jesd204_dev *jdev,
 }
 
 static int ad9528_jesd204_sysref(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1273,7 +1278,10 @@ static int ad9528_jesd204_sysref(struct jesd204_dev *jdev,
 	struct ad9528_state *st = iio_priv(indio_dev);
 	int ret, val;
 
-	dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	mutex_lock(&st->lock);
 
@@ -1299,6 +1307,7 @@ static int ad9528_jesd204_sysref(struct jesd204_dev *jdev,
 }
 
 static int ad9528_jesd204_link_pre_setup(struct jesd204_dev *jdev,
+		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
@@ -1306,7 +1315,10 @@ static int ad9528_jesd204_link_pre_setup(struct jesd204_dev *jdev,
 	struct ad9528_state *st = iio_priv(indio_dev);
 	int ret, kdiv;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
+	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
 	kdiv = DIV_ROUND_CLOSEST(st->sysref_src_pll2, st->jdev_lmfc_lemc_gcd);
 	kdiv = clamp_t(unsigned long, kdiv, 1UL, 65535UL);
