@@ -225,7 +225,7 @@ int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
 	link_op = jdev->state_ops[JESD204_OP_SYSREF].per_link;
 
 	if (link_op)
-		return link_op(jdev, lnk);
+		return link_op(jdev, 0, lnk);
 
 	return -ENODEV;
 }
