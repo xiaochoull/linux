@@ -5874,12 +5874,14 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 		},
 		[JESD204_OP_LINK_SETUP] = {
 			.per_device = adrv9009_jesd204_link_setup,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
 		},
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = adrv9009_jesd204_link_enable,
 		},
 		[JESD204_OP_LINK_SYSREF] = {
 			.per_device = adrv9009_jesd204_noop,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
 		},
 		[JESD204_OP_LINK_RUNNING] = {
 			.per_link = adrv9009_jesd204_link_running,
