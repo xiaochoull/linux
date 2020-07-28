@@ -3392,6 +3392,7 @@ static int adrv9009_restart(struct adrv9009_rf_phy *phy)
 			int retry = 1;
 			do {
 				jesd204_fsm_stop(phy->jdev, JESD204_LINKS_ALL);
+				jesd204_fsm_clear_errors(phy->jdev, JESD204_LINKS_ALL);
 				ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
 			} while (ret < 0 && retry--);
 		} else {
