@@ -1670,6 +1670,9 @@ static int hmc7044_jesd204_link_pre_setup(struct jesd204_dev *jdev,
 	int i, ret;
 	u32 sysref_timer;
 
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, lnk->link_id);
 
 	/* Program the output channels */
