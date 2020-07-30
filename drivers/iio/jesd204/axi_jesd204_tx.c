@@ -538,6 +538,9 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	long rate;
 	int ret;
 
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	config.device_id = lnk->did;
 	config.bank_id = lnk->bid;
 	config.lanes_per_device = jesd->num_lanes;
@@ -641,18 +644,6 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_tx_jesd204_clks_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
-
-	clk_disable_unprepare(jesd->lane_clk);
-	clk_disable_unprepare(jesd->device_clk);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
@@ -666,7 +657,9 @@ static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
 	case JESD204_STATE_OP_REASON_INIT:
 		break;
 	case JESD204_STATE_OP_REASON_UNINIT:
-		return axi_jesd204_tx_jesd204_clks_disable(jdev, lnk);
+		clk_disable_unprepare(jesd->lane_clk);
+		clk_disable_unprepare(jesd->device_clk);
+		return JESD204_STATE_CHANGE_DONE;
 	default:
 		return JESD204_STATE_CHANGE_DONE;
 	}
@@ -677,23 +670,12 @@ static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_tx_jesd204_link_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
-
-	writel_relaxed(0x1, jesd->base + JESD204_TX_REG_LINK_DISABLE);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	//struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 
 	dev_dbg(dev, "%s:%d link_num %u reason %s\n", __func__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
 
@@ -701,15 +683,11 @@ static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
 	case JESD204_STATE_OP_REASON_INIT:
 		break;
 	case JESD204_STATE_OP_REASON_UNINIT:
-		return axi_jesd204_tx_jesd204_link_disable(jdev, lnk);
+		writel_relaxed(0x1, jesd->base + JESD204_TX_REG_LINK_DISABLE);
+		return JESD204_STATE_CHANGE_DONE;
 	default:
 		return JESD204_STATE_CHANGE_DONE;
 	}
-
-	/* This is done in the previous state */
-
-	// writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
-	// writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
