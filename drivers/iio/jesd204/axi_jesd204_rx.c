@@ -830,18 +830,6 @@ static int axi_jesd204_rx_jesd204_link_setup(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_rx_jesd204_clks_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
-
-	clk_disable_unprepare(jesd->lane_clk);
-	clk_disable_unprepare(jesd->device_clk);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int axi_jesd204_rx_jesd204_clks_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
@@ -856,7 +844,9 @@ static int axi_jesd204_rx_jesd204_clks_enable(struct jesd204_dev *jdev,
 	case JESD204_STATE_OP_REASON_INIT:
 		break;
 	case JESD204_STATE_OP_REASON_UNINIT:
-		return axi_jesd204_rx_jesd204_clks_disable(jdev, lnk);
+		clk_disable_unprepare(jesd->lane_clk);
+		clk_disable_unprepare(jesd->device_clk);
+		return JESD204_STATE_CHANGE_DONE;
 	default:
 		return JESD204_STATE_CHANGE_DONE;
 	}
@@ -878,17 +868,6 @@ static int axi_jesd204_rx_jesd204_clks_enable(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_rx_jesd204_link_disable(struct jesd204_dev *jdev,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
-
-	writel_relaxed(0x1, jesd->base + JESD204_RX_REG_LINK_DISABLE);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int axi_jesd204_rx_jesd204_link_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
@@ -902,7 +881,8 @@ static int axi_jesd204_rx_jesd204_link_enable(struct jesd204_dev *jdev,
 	case JESD204_STATE_OP_REASON_INIT:
 		break;
 	case JESD204_STATE_OP_REASON_UNINIT:
-		return axi_jesd204_rx_jesd204_link_disable(jdev, lnk);
+		writel_relaxed(0x1, jesd->base + JESD204_RX_REG_LINK_DISABLE);
+		return JESD204_STATE_CHANGE_DONE;
 	default:
 		return JESD204_STATE_CHANGE_DONE;
 	}
