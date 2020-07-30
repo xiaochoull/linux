@@ -743,6 +743,9 @@ static int axi_jesd204_rx_jesd204_link_setup(struct jesd204_dev *jdev,
 	long rate;
 	int ret;
 
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	config.device_id = lnk->did;
 	config.bank_id = lnk->bid;
 	config.lanes_per_device = jesd->num_lanes;
