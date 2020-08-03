@@ -2956,10 +2956,6 @@ static int ad9081_register_iiodev(struct axiadc_converter *conv)
 	return ret;
 }
 
-
-
-
-
 static int ad9081_jesd204_link_init(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
@@ -3122,21 +3118,6 @@ int ad9081_jesd204_uninit(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-// int ad9081_jesd204_link_setup(struct jesd204_dev *jdev,
-// 				enum jesd204_state_op_reason reason)
-// {
-// 	struct device *dev = jesd204_dev_to_device(jdev);
-// 	struct ad9081_jesd204_priv *priv = jesd204_dev_priv(jdev);
-// 	struct ad9081_phy *phy = priv->phy;
-
-// 	if (reason != JESD204_STATE_OP_REASON_INIT)
-// 		return JESD204_STATE_CHANGE_DONE;
-
-// 	dev_dbg(dev, "%s:%d reason %s\n", __func__, __LINE__, jesd204_state_op_reason_str(reason));
-
-// 	return JESD204_STATE_CHANGE_DONE;
-// }
-
 static int ad9081_jesd204_setup_stage1(struct jesd204_dev *jdev,
 					 enum jesd204_state_op_reason reason)
 {
@@ -3237,10 +3218,6 @@ static const struct jesd204_dev_data jesd204_ad9081_init = {
 		[JESD204_OP_CLOCKS_ENABLE] = {
 			.per_link = ad9081_jesd204_clks_enable,
 		},
-		// [JESD204_OP_LINK_SETUP] = {
-		// 	.per_device = ad9081_jesd204_link_setup,
-		// 	.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
-		// },
 		[JESD204_OP_LINK_ENABLE] = {
 			.per_link = ad9081_jesd204_link_enable,
 		},
@@ -3259,7 +3236,6 @@ static const struct jesd204_dev_data jesd204_ad9081_init = {
 			.per_device = ad9081_jesd204_setup_stage3,
 			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
-
 	},
 
 	.num_links = 2,
