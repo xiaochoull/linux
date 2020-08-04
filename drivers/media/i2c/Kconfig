@@ -710,8 +710,9 @@ config VIDEO_APTINA_PLL
 
 config VIDEO_ADDI9036
 	tristate "Analog Devices ADDI9036 ToF sensor support"
-	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	depends on I2C && VIDEO_V4L2
 	depends on MEDIA_CAMERA_SUPPORT
+	select VIDEO_V4L2_SUBDEV_API
 	select V4L2_FWNODE
 	help
 	  This is a Video4Linux2 driver for Analog Devices ADDI9036
