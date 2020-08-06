@@ -1018,58 +1018,67 @@ static int jesd204_fsm_table(struct jesd204_dev *jdev,
 {
 	struct jesd204_fsm_table_entry_iter it;
 	struct jesd204_fsm_data data;
-	int cnt, ret, ret1;
+	int cnt, ret, ret1, retry;
+	const struct jesd204_fsm_table_entry *table_tmp = table;
+
+	retry = 3;
 
 	cnt = jesd204_device_count_get();
 	it.per_device_ran = kcalloc(cnt, sizeof(bool), GFP_KERNEL);
 	if (!it.per_device_ran)
 		return -ENOMEM;
 
-	it.table = table;
-
-	memset(&data, 0, sizeof(data));
-	data.fsm_change_cb = jesd204_fsm_table_entry_cb;
-	data.fsm_complete_cb = jesd204_fsm_table_entry_done;
-	data.cb_data = &it;
-	data.link_idx = link_idx;
-
-	ret1 = 0;
-	ret = 0;
-	/**
-	 * FIXME: the handle_busy_flags logic needs re-visit, we should lock
-	 * here and unlock after the loop is done
-	 */
-	while (!jesd204_fsm_table_end(&it.table[0], rollback)) {
-		memset(it.per_device_ran, 0, sizeof(bool) * cnt);
+	do {
 		it.table = table;
 
-		data.completed = false;
-		data.cur_state = init_state;
-		data.nxt_state = table[0].state;
-		data.rollback = rollback;
+		memset(&data, 0, sizeof(data));
+		data.fsm_change_cb = jesd204_fsm_table_entry_cb;
+		data.fsm_complete_cb = jesd204_fsm_table_entry_done;
+		data.cb_data = &it;
+		data.link_idx = link_idx;
 
-		ret = jesd204_fsm(jdev, &data, handle_busy_flags);
+		ret1 = 0;
+		ret = 0;
+		/**
+		 * FIXME: the handle_busy_flags logic needs re-visit, we should lock
+		 * here and unlock after the loop is done
+		 */
+		while (!jesd204_fsm_table_end(&it.table[0], rollback)) {
+			memset(it.per_device_ran, 0, sizeof(bool) * cnt);
+			it.table = table;
 
-		if (ret && !rollback) {
-			ret1 = ret;
-			if (!table[0].first)
+			data.completed = false;
+			data.cur_state = init_state;
+			data.nxt_state = table[0].state;
+			data.rollback = rollback;
+
+			ret = jesd204_fsm(jdev, &data, handle_busy_flags);
+
+			if (ret && !rollback) {
+				ret1 = ret;
+				if (!table[0].first)
+					table--;
+				jesd204_err(jdev, "Rolling back from '%s', got error %d\n",
+					jesd204_state_str(table[0].state), ret);
+				rollback = true;
+				continue;
+			}
+
+			if (!data.completed && !rollback)
+				break;
+
+			init_state = table[0].state;
+
+			if (rollback)
 				table--;
-			jesd204_err(jdev, "Rolling back from '%s', got error %d\n",
-				    jesd204_state_str(table[0].state), ret);
-			rollback = true;
-			continue;
+			else
+				table++;
 		}
 
-		if (!data.completed && !rollback)
-			break;
+		rollback = false;
+		table = table_tmp;
 
-		init_state = table[0].state;
-
-		if (rollback)
-			table--;
-		else
-			table++;
-	}
+	} while (ret1 && retry--);
 
 	kfree(it.per_device_ran);
 
