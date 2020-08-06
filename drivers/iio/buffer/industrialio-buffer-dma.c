@@ -548,20 +548,13 @@ size_t iio_dma_buffer_data_available(struct iio_buffer *buf)
 	struct iio_dma_buffer_block *block;
 	size_t data_available = 0;
 
-	/*
-	 * For counting the available bytes we'll use the size of the block not
-	 * the number of actual bytes available in the block. Otherwise it is
-	 * possible that we end up with a value that is lower than the watermark
-	 * but won't increase since all blocks are in use.
-	 */
-
 	mutex_lock(&queue->lock);
 	if (queue->fileio.active_block)
-		data_available += queue->fileio.active_block->block.size;
+		data_available += queue->fileio.active_block->block.bytes_used;
 
 	spin_lock_irq(&queue->list_lock);
 	list_for_each_entry(block, &queue->outgoing, head)
-		data_available += block->block.size;
+		data_available += block->block.bytes_used;
 	spin_unlock_irq(&queue->list_lock);
 	mutex_unlock(&queue->lock);
 
