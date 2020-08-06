@@ -1601,6 +1601,15 @@ static int iio_buffer_query_block(struct iio_buffer *buffer,
 	return 0;
 }
 
+static bool iio_buffer_dequeue_data_available(struct iio_buffer *buffer,
+					      enum iio_device_direction dir)
+{
+	if (dir == IIO_DEVICE_DIRECTION_OUT)
+		return iio_buffer_space_available(buffer);
+
+	return iio_buffer_data_available(buffer);
+}
+
 static int iio_buffer_dequeue_block(struct iio_dev *indio_dev,
 	struct iio_buffer_block __user *user_block, bool non_blocking)
 {
@@ -1612,12 +1621,12 @@ static int iio_buffer_dequeue_block(struct iio_dev *indio_dev,
 		return -ENOSYS;
 
 	do {
-		if (!iio_buffer_data_available(buffer)) {
+		if (!iio_buffer_dequeue_data_available(buffer, indio_dev->direction)) {
 			if (non_blocking)
 				return -EAGAIN;
 
 			ret = wait_event_interruptible(buffer->pollq,
-					iio_buffer_data_available(buffer) ||
+					iio_buffer_dequeue_data_available(buffer, indio_dev->direction) ||
 					indio_dev->info == NULL);
 			if (ret)
 				return ret;
