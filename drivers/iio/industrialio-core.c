@@ -135,6 +135,7 @@ static const char * const iio_modifier_names[] = {
 /* relies on pairs of these shared then separate */
 static const char * const iio_chan_info_postfix[] = {
 	[IIO_CHAN_INFO_RAW] = "raw",
+	[IIO_CHAN_INFO_LABEL] = "label",
 	[IIO_CHAN_INFO_PROCESSED] = "input",
 	[IIO_CHAN_INFO_SCALE] = "scale",
 	[IIO_CHAN_INFO_OFFSET] = "offset",
@@ -654,14 +655,18 @@ static ssize_t iio_read_channel_info(struct device *dev,
 	int ret;
 	int val_len = 2;
 
-	if (indio_dev->info->read_raw_multi)
+	if (indio_dev->info->read_raw_multi) {
 		ret = indio_dev->info->read_raw_multi(indio_dev, this_attr->c,
 							INDIO_MAX_RAW_ELEMENTS,
 							vals, &val_len,
 							this_attr->address);
-	else
+	} else {
 		ret = indio_dev->info->read_raw(indio_dev, this_attr->c,
 				    &vals[0], &vals[1], this_attr->address);
+		if (ret < 0 && this_attr->address == IIO_CHAN_INFO_LABEL &&
+			this_attr->c->label_name)
+			return sprintf(buf, "%s\n", this_attr->c->label_name);
+	}
 
 	if (ret < 0)
 		return ret;
@@ -1384,6 +1389,37 @@ static ssize_t iio_store_timestamp_clock(struct device *dev,
 	return len;
 }
 
+static int iio_device_add_channel_label(struct iio_dev *indio_dev,
+					struct device_node *np)
+{
+	unsigned int num_child;
+	struct iio_chan_spec *chan;
+	struct device_node *child;
+	const char *label;
+	int crt_ch = 0;
+
+	num_child = of_get_available_child_count(np);
+	if (!num_child)
+		return 0;
+
+	for_each_available_child_of_node(np, child) {
+		if (of_property_read_u32(child, "reg", &crt_ch))
+			continue;
+
+		if (crt_ch >= indio_dev->num_channels)
+			continue;
+
+		if (of_property_read_string(child, "label", &label))
+			continue;
+
+		chan = (struct iio_chan_spec *)&indio_dev->channels[crt_ch];
+		chan->info_mask_separate |= BIT(IIO_CHAN_INFO_LABEL);
+		chan->label_name = label;
+	}
+
+	return 0;
+}
+
 static DEVICE_ATTR(current_timestamp_clock, S_IRUGO | S_IWUSR,
 		   iio_show_timestamp_clock, iio_store_timestamp_clock);
 
@@ -1400,6 +1436,11 @@ static int iio_device_register_sysfs(struct iio_dev *indio_dev)
 			attrcount_orig++;
 	}
 	attrcount = attrcount_orig;
+
+	ret = iio_device_add_channel_label(indio_dev, indio_dev->dev.parent->of_node);
+	if (ret < 0)
+		return ret;
+
 	/*
 	 * New channel registration method - relies on the fact a group does
 	 * not need to be initialized if its name is NULL.
