@@ -2749,20 +2749,24 @@ static int ad9361_tx_quad_phase_search(struct ad9361_rf_phy *phy, u32 rxnco_word
 	struct ad9361_rf_phy_state *st = phy->state;
 	int i, ret;
 	u8 field[64], val;
-	u32 start;
+	u32 start, timeout = 100;
 
 	dev_dbg(&phy->spi->dev, "%s", __func__);
 
-	for (i = 0; i < (ARRAY_SIZE(field) / 2); i++) {
-		ret = __ad9361_tx_quad_calib(phy, i, rxnco_word, decim, &val);
-		if (ret < 0)
-			return ret;
+	do {
+		for (i = 0; i < (ARRAY_SIZE(field) / 2); i++) {
+			ret = __ad9361_tx_quad_calib(phy, i, rxnco_word, decim, &val);
+			if (ret < 0)
+				return ret;
 
-		/* Handle 360/0 wrap around */
-		field[i] = field[i + 32] = !((val & TX1_LO_CONV) && (val & TX1_SSB_CONV));
-	}
+			/* Handle 360/0 wrap around */
+			field[i] = field[i + 32] = !((val & TX1_LO_CONV) && (val & TX1_SSB_CONV));
+		}
 
-	ret = ad9361_find_opt(field, ARRAY_SIZE(field), &start);
+		ret = ad9361_find_opt(field, ARRAY_SIZE(field), &start);
+	} while (timeout-- && (ret == 0));
+	if (ret == 0)
+		return -ETIMEDOUT;
 
 	st->last_tx_quad_cal_phase = (start + ret / 2) & 0x1F;
 
@@ -2774,11 +2778,18 @@ static int ad9361_tx_quad_phase_search(struct ad9361_rf_phy *phy, u32 rxnco_word
 	       st->last_tx_quad_cal_phase);
 #endif
 
-	ret = __ad9361_tx_quad_calib(phy, st->last_tx_quad_cal_phase, rxnco_word, decim, NULL);
-	if (ret < 0)
-		return ret;
+	timeout = 100;
+	do {
+		ret = __ad9361_tx_quad_calib(phy, st->last_tx_quad_cal_phase, rxnco_word,
+						 decim, &val);
+		if (ret < 0)
+			return ret;
 
-	return 0;
+		if ((val & TX1_LO_CONV) && (val & TX1_SSB_CONV))
+			return 0;
+	} while (timeout--);
+
+	return -ETIMEDOUT;
 }
 
 static int ad9361_tx_quad_calib(struct ad9361_rf_phy *phy,
